@@ -1,0 +1,6 @@
+export enum AdNetwork {
+  GOOGLE = 'GOOGLE',
+  INSTAGRAM = 'INSTAGRAM',
+  TIKTOK = 'TIKTOK',
+  SNAPCHAT = 'SNAPCHAT',
+}

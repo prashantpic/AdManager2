@@ -1,0 +1,26 @@
+{
+  "name": "@admanager/types",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rimraf dist && tsc -p tsconfig.build.json",
+    "test": "jest --config ../../jest.config.js --rootDir .",
+    "lint": "eslint src --ext .ts",
+    "clean": "rimraf dist node_modules",
+    "clean:dist": "rimraf dist"
+  },
+  "dependencies": {
+    "class-validator": "^0.14.1",
+    "class-transformer": "^0.5.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.8"
+  },
+  "peerDependencies": {},
+  "publishConfig": {
+    "access": "restricted"
+  }
+}

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "merchant-ad-manager-portal.fullname" . }}
+  labels:
+    {{- include "merchant-ad-manager-portal.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }} # Should match containerPort name or number
+      protocol: TCP
+      name: http # Name of the port
+  selector:
+    {{- include "merchant-ad-manager-portal.selectorLabels" . | nindent 4 }}

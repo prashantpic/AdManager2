@@ -1,0 +1,34 @@
+{
+  "validCampaign": {
+    "name": "Summer Sale Campaign 2024",
+    "budget": 5000,
+    "startDate": "2024-07-01",
+    "endDate": "2024-07-31",
+    "targetNetworks": ["Google", "Instagram"],
+    "status": "Draft"
+  },
+  "campaignForEditing": {
+    "name": "Ongoing Q3 Promotion",
+    "budget": 2500,
+    "startDate": "2024-07-01",
+    "endDate": "2024-09-30",
+    "targetNetworks": ["TikTok"],
+    "status": "Active"
+  },
+  "campaignWithInvalidData": {
+    "name": "",
+    "budget": -100,
+    "startDate": "2024-08-01",
+    "endDate": "2024-07-15",
+    "targetNetworks": [],
+    "status": "Draft"
+  },
+  "simpleCampaignForUiCreation": {
+    "name": "UI Test Campaign",
+    "budget": 100,
+    "startDate": "2025-01-01",
+    "endDate": "2025-01-31",
+    "network": "Google",
+    "status": "Active"
+  }
+}

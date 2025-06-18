@@ -1,0 +1,72 @@
+version: 0.0
+# This AppSpec file is used by AWS CodeDeploy to manage deployments to Amazon ECS.
+# It should be included in the build artifact of backend services.
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        # TaskDefinition ARN is dynamically provided by CodeDeploy during deployment.
+        # It references the new task definition version created from 'taskdef.json' (also in the artifact).
+        TaskDefinition: "<TASK_DEFINITION_ARN_PLACEHOLDER>"
+        LoadBalancerInfo:
+          # ContainerName and ContainerPort must match the container and port in the Task Definition
+          # that the load balancer's target group should route traffic to.
+          ContainerName: "<YOUR_ECS_CONTAINER_NAME_PLACEHOLDER>" # e.g., campaign-service-container
+          ContainerPort: <YOUR_ECS_CONTAINER_PORT_PLACEHOLDER>   # e.g., 3000
+        # Optional: Specify platform version for Fargate services if not using cluster default
+        # PlatformVersion: "LATEST"
+        # Optional: NetworkConfiguration for Fargate tasks if it needs to be updated during deployment
+        # (usually configured in the ECS service definition itself via CDK/CloudFormation)
+        # NetworkConfiguration:
+        #   AwsvpcConfiguration:
+        #     Subnets: ["<SUBNET_ID_1>", "<SUBNET_ID_2>"]
+        #     SecurityGroups: ["<SECURITY_GROUP_ID>"]
+        #     AssignPublicIp: "ENABLED" # or "DISABLED"
+
+# Hooks section defines Lambda functions to run at different stages of the deployment lifecycle.
+# These are optional and allow for custom logic like validation, smoke tests, or pre/post traffic shifting actions.
+# Ensure the CodeDeploy IAM role has permission to invoke these Lambda functions.
+Hooks:
+  # - BeforeInstall:
+  #     # Runs before the new task definition is registered and the ECS service starts to update.
+  #     # Useful for pre-deployment checks or setup.
+  #     LambdaFunctionName: "MyPreInstallHookLambda-<LAMBDA_ALIAS_OR_VERSION_PLACEHOLDER>"
+  #     Timeout: 300 # Seconds
+  - AfterInstall:
+      # Runs after the new task definition is registered and the ECS service is updated to start tasks with the new version,
+      # but before traffic is shifted to the new version (in a blue/green deployment).
+      # Useful for running initial health checks or smoke tests on the new tasks.
+      LambdaFunctionName: "MyPostInstallHookLambda-<LAMBDA_ALIAS_OR_VERSION_PLACEHOLDER>" # Example hook for validation
+      Timeout: 180
+  - AfterAllowTestTraffic:
+      # Runs after a portion of traffic (test traffic) is shifted to the new task set in a blue/green deployment.
+      # This hook is only invoked if a test listener is configured on the load balancer.
+      # Useful for running integration tests or more comprehensive validation with live test traffic.
+      LambdaFunctionName: "MyTestTrafficHookLambda-<LAMBDA_ALIAS_OR_VERSION_PLACEHOLDER>"
+      Timeout: 180
+  # - BeforeAllowTraffic:
+  #     # Runs after all tests and validations on the new version are complete, but before shifting all production traffic.
+  #     # Useful for final checks or manual approvals if integrated.
+  #     LambdaFunctionName: "MyPreTrafficHookLambda-<LAMBDA_ALIAS_OR_VERSION_PLACEHOLDER>"
+  #     Timeout: 180
+  # - AfterAllowTraffic:
+  #     # Runs after all production traffic is shifted to the new version.
+  #     # Useful for post-deployment cleanup or notifications.
+  #     LambdaFunctionName: "MyPostTrafficHookLambda-<LAMBDA_ALIAS_OR_VERSION_PLACEHOLDER>"
+  #     Timeout: 180
+
+# Note on <TASK_DEFINITION_ARN_PLACEHOLDER>:
+# This placeholder is dynamically replaced by AWS CodeDeploy during the deployment process.
+# CodeDeploy uses the ARN of the new task definition version that it creates based on the
+# `taskdef.json` file. The `taskdef.json` file, which should also be part of the build artifact,
+# must define the container image URI (pointing to the newly built Docker image in ECR),
+# port mappings, environment variables, CPU/memory, etc.
+#
+# Note on <YOUR_ECS_CONTAINER_NAME_PLACEHOLDER> and <YOUR_ECS_CONTAINER_PORT_PLACEHOLDER>:
+# These must match the `name` of one of the containers defined in your `taskdef.json` and
+# the `containerPort` that the load balancer's target group is configured to forward traffic to.
+#
+# Example Lambda Function Naming:
+# It's a good practice to include an alias or version for Lambda functions used in hooks
+# to ensure that CodeDeploy invokes the intended version of your Lambda logic.
+# e.g., MyPostInstallHookLambda-live or MyPostInstallHookLambda-v1

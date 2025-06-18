@@ -1,0 +1,20 @@
+[
+  {
+    "username": "admin@admanager.com",
+    "password": "SecurePassword123!",
+    "role": "merchantAdmin",
+    "description": "Merchant Admin User"
+  },
+  {
+    "username": "manager@admanager.com",
+    "password": "AnotherSecurePassword456!",
+    "role": "campaignManager",
+    "description": "Campaign Manager User"
+  },
+  {
+    "username": "invalid_user@admanager.com",
+    "password": "InvalidPassword",
+    "role": "unknown",
+    "description": "User for testing invalid login"
+  }
+]

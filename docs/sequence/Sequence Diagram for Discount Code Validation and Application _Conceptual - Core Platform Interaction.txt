@@ -1,0 +1,49 @@
+sequenceDiagram
+    actor "External Core Platform Checkout Process" as ExternalCorePlatformCheckoutProcess
+    participant "Core Platform Integration Service" as coreplatformintegrationservice013
+    participant "Promotions & Offers Service" as promotionsoffersservice004
+    participant "Ad Manager DB" as admanagerpostgresqldb022
+
+    note over ExternalCorePlatformCheckoutProcess: Customer initiates by entering discount code on the [PlatformName] core e-commerce platform's checkout page.
+    ExternalCorePlatformCheckoutProcess-coreplatformintegrationservice013: 1. validateDiscountCode(code, cartContext)
+    activate coreplatformintegrationservice013
+
+    coreplatformintegrationservice013-promotionsoffersservice004: 2. validateDiscountCode(code, cartContext)
+    activate promotionsoffersservice004
+
+    promotionsoffersservice004-admanagerpostgresqldb022: 3. queryDiscountCodeDetails(code)
+    activate admanagerpostgresqldb022
+    admanagerpostgresqldb022--promotionsoffersservice004: 4. discountCodeDetails (e.g., validity, rules, limits, currentUsage)
+    deactivate admanagerpostgresqldb022
+
+    note over promotionsoffersservice004: Promotions & Offers Service applies business rules: checks if code is active, not expired, within usage limits, and meets any customer/cart eligibility criteria from cartContext or core platform data.
+    promotionsoffersservice004-promotionsoffersservice004: 5. Perform validation logic (check eligibility, limits, dates, cart context)
+
+    promotionsoffersservice004--coreplatformintegrationservice013: 6. validationResult (isValid, discountDetails, reason)
+    deactivate promotionsoffersservice004
+
+    coreplatformintegrationservice013--ExternalCorePlatformCheckoutProcess: 7. validationResult (isValid, discountDetails, reason)
+    deactivate coreplatformintegrationservice013
+
+    alt Discount Code Validation
+        opt [isValid == true]
+            activate ExternalCorePlatformCheckoutProcess
+            ExternalCorePlatformCheckoutProcess-ExternalCorePlatformCheckoutProcess: 8.1.1. Apply discount to order
+            deactivate ExternalCorePlatformCheckoutProcess
+            note right of ExternalCorePlatformCheckoutProcess: Discount code usage notification and recording (steps 8.1.2 onwards) is ideally asynchronous to avoid blocking the checkout process. Acknowledgements for these async steps are optional and omitted for brevity.
+            ExternalCorePlatformCheckoutProcess-coreplatformintegrationservice013: 8.1.2. notifyDiscountCodeUsage(code, orderId, usageTimestamp)
+            activate coreplatformintegrationservice013
+            coreplatformintegrationservice013-promotionsoffersservice004: 8.1.3. recordDiscountCodeUsage(code, orderId, usageTimestamp)
+            activate promotionsoffersservice004
+            promotionsoffersservice004-admanagerpostgresqldb022: 8.1.4. incrementUsageCount(code) OR markCodeAsUsed(code, customerId)
+            activate admanagerpostgresqldb022
+            admanagerpostgresqldb022--promotionsoffersservice004: 8.1.5. updateStatus
+            deactivate admanagerpostgresqldb022
+            deactivate promotionsoffersservice004
+            deactivate coreplatformintegrationservice013
+        else [isValid == false]
+            activate ExternalCorePlatformCheckoutProcess
+            ExternalCorePlatformCheckoutProcess-ExternalCorePlatformCheckoutProcess: 8.2.1. Display error message to customer (using validationResult.reason)
+            deactivate ExternalCorePlatformCheckoutProcess
+    end
+    note over ExternalCorePlatformCheckoutProcess, admanagerpostgresqldb022: This diagram is conceptual regarding the Core Platform's internal checkout details but focuses on the integration points for discount code validation and usage tracking managed by the Ad Manager's services.

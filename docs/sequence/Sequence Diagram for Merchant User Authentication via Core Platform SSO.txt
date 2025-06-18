@@ -1,0 +1,83 @@
+sequenceDiagram
+    actor "User" as UserActor
+    participant "Merchant AdManager Portal (SPA)" as merchantadmanagerportalspa018
+    participant "AdManager API Gateway" as admanagerapigateway019
+    participant "Authentication Delegator" as securitylayerauthenticationdelegator026
+    participant "External Core Platform Auth API" as ExternalCorePlatformAuthAPI
+    participant "User Access Management Service" as useraccessmanagementservice009
+    participant "AdManager Cache" as admanagercache024
+
+    UserActor--merchantadmanagerportalspa018: 1. Clicks 'Login with [PlatformName]'
+    activate merchantadmanagerportalspa018
+
+    merchantadmanagerportalspa018--admanagerapigateway019: 2. GET /auth/sso/initiate-login (Request Core Platform Auth URL)
+    activate admanagerapigateway019
+
+    admanagerapigateway019--securitylayerauthenticationdelegator026: 3. GET /sso/initiate-login
+    activate securitylayerauthenticationdelegator026
+
+    securitylayerauthenticationdelegator026--securitylayerauthenticationdelegator026: 4. Generate Core Platform OAuth Authorization URL (with clientid, redirecturi, scope, state)
+    securitylayerauthenticationdelegator026--admanagerapigateway019: 5. Return { redirectUrl: 'coreplatformauthurl' }
+    deactivate securitylayerauthenticationdelegator026
+
+    admanagerapigateway019--merchantadmanagerportalspa018: 6. Return { redirectUrl: 'coreplatformauthurl' }
+    deactivate admanagerapigateway019
+
+    note right of merchantadmanagerportalspa018: Browser redirection part of OAuth flow.
+    merchantadmanagerportalspa018--ExternalCorePlatformAuthAPI: 7. User's Browser redirects to 'coreplatformauthurl'
+    activate ExternalCorePlatformAuthAPI
+
+    UserActor--ExternalCorePlatformAuthAPI: 8. User authenticates with Core Platform (enters credentials)
+
+    note right of ExternalCorePlatformAuthAPI: Browser redirection part of OAuth flow. Callback hits AdManager API Gateway.
+    ExternalCorePlatformAuthAPI--merchantadmanagerportalspa018: 9. User's Browser redirected to AdManager callbackuri with 'authorizationcode' & 'state'
+    deactivate ExternalCorePlatformAuthAPI
+
+    merchantadmanagerportalspa018--admanagerapigateway019: 10. GET /auth/sso/callback?code={authcode}&state={stateval}
+    activate admanagerapigateway019
+
+    admanagerapigateway019--securitylayerauthenticationdelegator026: 11. GET /sso/callback?code={authcode}&state={stateval}
+    activate securitylayerauthenticationdelegator026
+
+    securitylayerauthenticationdelegator026--securitylayerauthenticationdelegator026: 12. Validate 'state' parameter
+
+    securitylayerauthenticationdelegator026--ExternalCorePlatformAuthAPI: 13. POST /token (Exchange 'authorizationcode' for tokens)
+    activate ExternalCorePlatformAuthAPI
+
+    ExternalCorePlatformAuthAPI--securitylayerauthenticationdelegator026: 14. Return Core Platform { accesstoken, idtoken, refreshtoken }
+    deactivate ExternalCorePlatformAuthAPI
+
+    securitylayerauthenticationdelegator026--securitylayerauthenticationdelegator026: 15. Validate Core Platform idtoken, extract coreuserid
+
+    securitylayerauthenticationdelegator026--useraccessmanagementservice009: 16. GET /users/core/{coreuserid}/profile (Request AdManager profile & permissions)
+    activate useraccessmanagementservice009
+
+    useraccessmanagementservice009--admanagercache024: 16.1 GET permissionsandprofile:coreuserid:{coreuserid}
+    activate admanagercache024
+
+    alt Cache Check for User Profile & Permissions
+        admanagercache024--useraccessmanagementservice009: 16.2.1.1 Return Cached Profile & Permissions
+    else Cache Miss: Profile & Permissions NOT found
+        admanagercache024--useraccessmanagementservice009: 16.2.2.1 Return Cache Miss (Not Found)
+        useraccessmanagementservice009--useraccessmanagementservice009: 16.2.2.2 Query Internal Database for Profile & Permissions (e.g., PostgreSQL)
+        useraccessmanagementservice009--admanagercache024: 16.2.2.3 SET permissionsandprofile:coreuserid:{coreuserid} with DB data
+        admanagercache024--useraccessmanagementservice009: 16.2.2.4 Return OK
+    end
+    deactivate admanagercache024
+
+    useraccessmanagementservice009--securitylayerauthenticationdelegator026: 17. Return AdManager User Profile { adManagerUserId, roles, permissions }
+    deactivate useraccessmanagementservice009
+
+    securitylayerauthenticationdelegator026--securitylayerauthenticationdelegator026: 18. Generate AdManager Session JWT (Access Token, Refresh Token) including adManagerUserId, roles
+
+    note right of securitylayerauthenticationdelegator026: Refresh Token may be set as an HttpOnly cookie by the backend (APIGW/AuthDelegator) response headers, rather than being in the JSON payload to the SPA.
+    securitylayerauthenticationdelegator026--admanagerapigateway019: 19. Return { accessToken, refreshToken, userProfile }
+    deactivate securitylayerauthenticationdelegator026
+
+    admanagerapigateway019--merchantadmanagerportalspa018: 20. Return { accessToken, refreshToken, userProfile }
+    deactivate admanagerapigateway019
+
+    merchantadmanagerportalspa018--merchantadmanagerportalspa018: 21. Store tokens securely. Update UI to authenticated state. Navigate to dashboard.
+    deactivate merchantadmanagerportalspa018
+
+    note over UserActor, admanagercache024: Assumes successful authentication path. Error handling (e.g., incorrect credentials, Core Platform unavailability, user not found in AdManager) would involve alternative flows returning error responses to the Portal.

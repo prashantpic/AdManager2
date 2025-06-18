@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "merchant-ad-manager-portal.fullname" . }}
+  labels:
+    {{- include "merchant-ad-manager-portal.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "merchant-ad-manager-portal.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        {{- include "merchant-ad-manager-portal.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.podAnnotations }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- end }}
+        {{- if .Values.featureToggles.enableIstioIntegration }}
+        sidecar.istio.io/inject: "true"
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "merchant-ad-manager-portal.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }} # e.g. 80 for Nginx
+              protocol: TCP
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            {{- omit .Values.startupProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- if .Values.configData }}
+            {{- range $key, $value := .Values.configData }}
+            # For frontends, env vars might be used by Node.js SSR or startup scripts
+            # For SPAs served by Nginx, ConfigMap data is often mounted as files
+            - name: {{ $key | upper | replace "-" "_" }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # Volume mounts for frontend config (e.g., Nginx config, runtime JS config files)
+          volumeMounts:
+            {{- if .Values.configData }}
+            - name: portal-config-volume
+              mountPath: /usr/share/nginx/html/config # Example path for JS config files
+                                                    # Or /etc/nginx/conf.d/ for nginx.conf snippets
+            {{- end }}
+            # - name: static-assets # If assets are not part of the image
+            #   mountPath: /usr/share/nginx/html
+      volumes:
+        {{- if .Values.configData }}
+        - name: portal-config-volume
+          configMap:
+            name: {{ include "merchant-ad-manager-portal.fullname" . }}-config
+            # items: # Optionally mount specific keys as specific file names
+            #   - key: API_GATEWAY_URL
+            #     path: app.config.js # Example
+        {{- end }}
+        # - name: static-assets
+        #   emptyDir: {} # Or PVC if assets are provisioned separately
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: Ad Manager Shared API Components
+  version: v1
+  description: Shared components for Ad Manager APIs, including schemas, security schemes, parameters, and responses.
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The time the error occurred.
+        status:
+          type: integer
+          description: HTTP status code.
+        error:
+          type: string
+          description: A short error description (e.g., 'Not Found', 'Bad Request').
+        message:
+          type: string
+          description: A human-readable message providing more details about the error.
+        path:
+          type: string
+          description: The path of the request that resulted in an error.
+        details:
+          type: array
+          items:
+            type: string
+          description: Optional array of more specific error details or validation messages.
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+        - path
+
+    PaginationInfo:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+          description: Current page number.
+        size:
+          type: integer
+          format: int32
+          description: Number of items per page.
+        totalPages:
+          type: integer
+          format: int32
+          description: Total number of pages.
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of elements.
+
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the campaign.
+        name:
+          type: string
+          description: Name of the campaign.
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, ARCHIVED, DRAFT]
+          description: Status of the campaign.
+        budget:
+          type: number
+          format: double
+          description: Budget for the campaign.
+        startDate:
+          type: string
+          format: date-time
+          description: Start date of the campaign.
+        endDate:
+          type: string
+          format: date-time
+          description: End date of the campaign.
+      required:
+        - id
+        - name
+        - status
+
+    AdSet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the Ad Set.
+        campaignId:
+          type: string
+          format: uuid
+          description: Identifier of the parent campaign.
+        name:
+          type: string
+          description: Name of the Ad Set.
+        # Add other common AdSet properties
+      required:
+        - id
+        - campaignId
+        - name
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the product.
+        name:
+          type: string
+          description: Name of the product.
+        price:
+          type: number
+          format: double
+        # Add other common product properties
+      required:
+        - id
+        - name
+        - price
+
+  securitySchemes:
+    JWTBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication. Token should be passed in the Authorization header.
+
+  parameters:
+    CorrelationIdHeader:
+      name: X-Correlation-ID
+      in: header
+      description: Unique identifier for tracking a request across services.
+      required: false
+      schema:
+        type: string
+        format: uuid
+    MerchantIdHeader: # Example, might not be needed if implicit in token
+      name: X-Merchant-ID
+      in: header
+      description: Identifier of the merchant context for the request.
+      required: false # Or true, depending on design
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2023-01-01T12:00:00Z"
+            status: 401
+            error: "Unauthorized"
+            message: "Valid authentication credentials are required to access this resource."
+            path: "/merchant/v1/campaigns"
+    ForbiddenError:
+      description: Client is authenticated but does not have permission to access the requested resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2023-01-01T12:00:00Z"
+            status: 403
+            error: "Forbidden"
+            message: "You do not have permission to perform this action."
+            path: "/admin/v1/users/some-user-id"
+    NotFoundError:
+      description: The requested resource could not be found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2023-01-01T12:00:00Z"
+            status: 404
+            error: "Not Found"
+            message: "The resource with ID 'xyz' was not found."
+            path: "/merchant/v1/campaigns/xyz"
+    BadRequestError:
+      description: The request could not be understood by the server due to malformed syntax or invalid parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2023-01-01T12:00:00Z"
+            status: 400
+            error: "Bad Request"
+            message: "Invalid input provided."
+            path: "/merchant/v1/campaigns"
+            details: ["field 'name' cannot be empty"]
+    InternalServerError:
+      description: An unexpected condition was encountered on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2023-01-01T12:00:00Z"
+            status: 500
+            error: "Internal Server Error"
+            message: "An unexpected error occurred. Please try again later."
+            path: "/merchant/v1/some-endpoint"
+    RateLimitExceededError:
+      description: Too many requests. Rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2023-01-01T12:00:00Z"
+            status: 429
+            error: "Too Many Requests"
+            message: "You have exceeded the request rate limit. Please try again later."
+            path: "/merchant/v1/some-endpoint"

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package admanager.coreplatformintegration.service.v1;
+
+message DirectOrderLinkRequest {
+  string product_id = 1;
+  optional int32 quantity = 2;
+  string merchant_id = 3;
+}
+
+message DirectOrderLinkResponse {
+  string deep_link_url = 1;
+}

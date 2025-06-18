@@ -1,0 +1,74 @@
+sequenceDiagram
+    actor "Merchant Ad Manager Portal" as merchantadmanagerportalspa018
+    participant "Ad Manager API Gateway" as admanagerapigateway019
+    participant "Billing & Monetization Service" as billingmonetizationservice015
+    participant "Third-Party Connectivity Service" as thirdpartyconnectivityservice014
+    participant "External Payment Gateway" as ExternalPaymentGatewayGenericAPI
+    participant "Ad Manager Database (PostgreSQL)" as admanagerpostgresqldb022
+    participant "User Access Management Service" as useraccessmanagementservice009
+
+    note over merchantadmanagerportalspa018: Merchant initiates subscription upgrade by selecting a new plan and providing payment details (e.g., a payment token obtained via a client-side integration with a payment gateway provider).
+    merchantadmanagerportalspa018--admanagerapigateway019: 1. POST /subscriptions/upgrade (planId, paymentDetailsToken)
+    activate admanagerapigateway019
+
+    note over admanagerapigateway019: API Gateway authenticates the request and forwards it, adding merchant context (merchantId).
+    admanagerapigateway019--billingmonetizationservice015: 2. upgradeSubscription(planId, paymentDetailsToken, merchantId)
+    activate billingmonetizationservice015
+
+    note over billingmonetizationservice015: Billing & Monetization Service calculates the amount due based on the selected plan for the specific merchant.
+    billingmonetizationservice015--thirdpartyconnectivityservice014: 3. processPayment(amount, paymentToken, currency, merchantId, description)
+    activate thirdpartyconnectivityservice014
+
+    note over thirdpartyconnectivityservice014: Third-Party Connectivity Service abstracts the specific payment gateway API call, handling communication with the external gateway.
+    thirdpartyconnectivityservice014--ExternalPaymentGatewayGenericAPI: 4. charge(paymentToken, amount, currency, description)
+    activate ExternalPaymentGatewayGenericAPI
+
+    ExternalPaymentGatewayGenericAPI--thirdpartyconnectivityservice014: 5. paymentResult (status, transactionId, errorCode, errorMessage)
+    deactivate ExternalPaymentGatewayGenericAPI
+
+    thirdpartyconnectivityservice014--billingmonetizationservice015: 6. paymentProcessingResult (status, transactionId, errorDetails)
+    deactivate thirdpartyconnectivityservice014
+
+    alt 7.1 [Payment Successful]
+        note right of billingmonetizationservice015: DB operations (Subscription, Invoice, PaymentRecord) within the successful payment path are assumed to be part of a single logical transaction or managed for consistency by the Billing & Monetization Service.
+        billingmonetizationservice015--admanagerpostgresqldb022: 7.1.1. UPDATE/CREATE Subscription (merchantId, newPlanId, status='active', startDate, transactionId)
+        activate admanagerpostgresqldb022
+        admanagerpostgresqldb022--billingmonetizationservice015: 7.1.2. Subscription Update Confirmation (success/failure)
+        deactivate admanagerpostgresqldb022
+
+        billingmonetizationservice015--admanagerpostgresqldb022: 7.1.3. CREATE Invoice (merchantId, planId, amount, status='paid')
+        activate admanagerpostgresqldb022
+        admanagerpostgresqldb022--billingmonetizationservice015: 7.1.4. Invoice Creation Confirmation (success/failure)
+        deactivate admanagerpostgresqldb022
+
+        billingmonetizationservice015--admanagerpostgresqldb022: 7.1.5. CREATE PaymentRecord (invoiceId, transactionId, amount, gatewayName)
+        activate admanagerpostgresqldb022
+        admanagerpostgresqldb022--billingmonetizationservice015: 7.1.6. PaymentRecord Creation Confirmation (success/failure)
+        deactivate admanagerpostgresqldb022
+
+        opt 7.1.7 [If feature access update is configured/needed based on plan]
+            note right of useraccessmanagementservice009: User Access Management Service is notified asynchronously to update permissions/roles based on the new plan. This does not block the success response to the merchant.
+            billingmonetizationservice015--useraccessmanagementservice009: 7.1.7.1. notifyPlanUpdateAsync(merchantId, newPlanId, transactionId)
+            activate useraccessmanagementservice009
+            deactivate useraccessmanagementservice009
+        end
+
+        billingmonetizationservice015--admanagerapigateway019: 7.1.8. upgradeSubscriptionResponse (status: success, subscriptionDetails)
+
+        note over merchantadmanagerportalspa018: Portal displays success message and updated subscription details to the merchant.
+        admanagerapigateway019--merchantadmanagerportalspa018: 7.1.9. HTTP 200 OK (data: subscriptionDetails)
+
+    else 7.2 [Payment Failed]
+        billingmonetizationservice015--admanagerpostgresqldb022: 7.2.1. LOG FailedPaymentAttempt (merchantId, planId, errorDetails, transactionId)
+        activate admanagerpostgresqldb022
+        admanagerpostgresqldb022--billingmonetizationservice015: 7.2.2. Log Confirmation (success/failure)
+        deactivate admanagerpostgresqldb022
+
+        billingmonetizationservice015--admanagerapigateway019: 7.2.3. upgradeSubscriptionResponse (status: paymentfailed, errorDetails)
+
+        note over merchantadmanagerportalspa018: Portal displays payment failure message to the merchant, allowing them to retry or update payment details.
+        admanagerapigateway019--merchantadmanagerportalspa018: 7.2.4. HTTP 400 Bad Request (error: paymentfailed, details)
+    end
+
+    deactivate billingmonetizationservice015
+    deactivate admanagerapigateway019

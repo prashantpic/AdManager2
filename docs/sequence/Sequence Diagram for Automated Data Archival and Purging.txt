@@ -1,0 +1,105 @@
+sequenceDiagram
+    actor "Scheduler" as scheduleractor
+    participant "PlatformAdministrationService" as platformadministrationservice010
+    participant "DataGovernanceComplianceService" as datagovernancecomplianceservice011
+    participant "AdManagerPostgreSQLDB" as admanagerpostgresqldb022
+    participant "AdManagerDynamoDBTables" as admanagerdynamodbtables023
+    participant "Amazon S3 Storage" as amazons3storage
+
+    note over scheduleractor: Scheduler triggers the data retention job periodically (e.g., daily, weekly).
+    scheduleractor-platformadministrationservice010: 1. TriggerScheduledDataRetentionJob()
+    activate platformadministrationservice010
+
+    platformadministrationservice010-datagovernancecomplianceservice011: 2. ExecuteDataRetentionTasks(jobConfig)
+    activate datagovernancecomplianceservice011
+
+    datagovernancecomplianceservice011-admanagerpostgresqldb022: 2.1. FetchRetentionPolicies()
+    activate admanagerpostgresqldb022
+    admanagerpostgresqldb022--datagovernancecomplianceservice011: RetentionPolicyList
+    deactivate admanagerpostgresqldb022
+
+    loop 2.2. For each policy in RetentionPolicyList
+        alt 2.2.1. If policy applies to PostgreSQL data
+            datagovernancecomplianceservice011-admanagerpostgresqldb022: 2.2.1.1. IdentifyEligiblePostgreSQLData(policy)
+            activate admanagerpostgresqldb022
+            admanagerpostgresqldb022--datagovernancecomplianceservice011: EligibleDataList
+            deactivate admanagerpostgresqldb022
+
+            loop 2.2.1.2. For each item/batch in EligibleDataList (PostgreSQL)
+                note over datagovernancecomplianceservice011, admanagerpostgresqldb022: Error handling for individual data item processing (e.g., retry, log specific item failure) is omitted for brevity but should be implemented.
+                alt 2.2.1.2.1. If policy.action == 'Archive'
+                    datagovernancecomplianceservice011-admanagerpostgresqldb022: 2.2.1.2.1.1. ReadDataForArchival(dataItem)
+                    activate admanagerpostgresqldb022
+                    admanagerpostgresqldb022--datagovernancecomplianceservice011: DataItemContent
+                    deactivate admanagerpostgresqldb022
+
+                    datagovernancecomplianceservice011-amazons3storage: 2.2.1.2.1.2. ArchiveData(dataItemContent)
+                    activate amazons3storage
+                    amazons3storage--datagovernancecomplianceservice011: ArchiveConfirmation
+                    deactivate amazons3storage
+
+                    datagovernancecomplianceservice011-admanagerpostgresqldb022: 2.2.1.2.1.3. DeleteArchivedData(dataItem)
+                    activate admanagerpostgresqldb022
+                    admanagerpostgresqldb022--datagovernancecomplianceservice011: DeleteConfirmation
+                    deactivate admanagerpostgresqldb022
+
+                    datagovernancecomplianceservice011-datagovernancecomplianceservice011: 2.2.1.2.1.4. LogAuditEvent(action='Archive', item=dataItem, status='Success')
+                    note right of datagovernancecomplianceservice011: DataGovernanceComplianceService uses SharedAuditLogClient library internally to log audit events. The actual sink (e.g., CloudWatch Logs) is not shown as a direct participant.
+
+                else 2.2.1.2.2. Else If policy.action == 'Purge'
+                    datagovernancecomplianceservice011-admanagerpostgresqldb022: 2.2.1.2.2.1. PurgeData(dataItem)
+                    activate admanagerpostgresqldb022
+                    admanagerpostgresqldb022--datagovernancecomplianceservice011: PurgeConfirmation
+                    deactivate admanagerpostgresqldb022
+
+                    datagovernancecomplianceservice011-datagovernancecomplianceservice011: 2.2.1.2.2.2. LogAuditEvent(action='Purge', item=dataItem, status='Success')
+                end
+            end
+        else 2.2.2. If policy applies to DynamoDB data
+            datagovernancecomplianceservice011-admanagerdynamodbtables023: 2.2.2.1. IdentifyEligibleDynamoDBData(policy)
+            activate admanagerdynamodbtables023
+            admanagerdynamodbtables023--datagovernancecomplianceservice011: EligibleDataList
+            deactivate admanagerdynamodbtables023
+
+            loop 2.2.2.2. For each item/batch in EligibleDataList (DynamoDB)
+                alt 2.2.2.2.1. If policy.action == 'Archive'
+                    datagovernancecomplianceservice011-admanagerdynamodbtables023: 2.2.2.2.1.1. ReadDataForArchival(dataItem)
+                    activate admanagerdynamodbtables023
+                    admanagerdynamodbtables023--datagovernancecomplianceservice011: DataItemContent
+                    deactivate admanagerdynamodbtables023
+
+                    datagovernancecomplianceservice011-amazons3storage: 2.2.2.2.1.2. ArchiveData(dataItemContent)
+                    activate amazons3storage
+                    amazons3storage--datagovernancecomplianceservice011: ArchiveConfirmation
+                    deactivate amazons3storage
+
+                    datagovernancecomplianceservice011-admanagerdynamodbtables023: 2.2.2.2.1.3. DeleteArchivedData(dataItem)
+                    activate admanagerdynamodbtables023
+                    admanagerdynamodbtables023--datagovernancecomplianceservice011: DeleteConfirmation
+                    deactivate admanagerdynamodbtables023
+
+                    datagovernancecomplianceservice011-datagovernancecomplianceservice011: 2.2.2.2.1.4. LogAuditEvent(action='Archive', item=dataItem, status='Success')
+
+                else 2.2.2.2.2. Else If policy.action == 'Purge'
+                    datagovernancecomplianceservice011-admanagerdynamodbtables023: 2.2.2.2.2.1. PurgeData(dataItem)
+                    activate admanagerdynamodbtables023
+                    admanagerdynamodbtables023--datagovernancecomplianceservice011: PurgeConfirmation
+                    deactivate admanagerdynamodbtables023
+
+                    datagovernancecomplianceservice011-datagovernancecomplianceservice011: 2.2.2.2.2.2. LogAuditEvent(action='Purge', item=dataItem, status='Success')
+                end
+            end
+        end
+    end
+
+    alt 2.3. If any error occurred during processing
+        datagovernancecomplianceservice011-datagovernancecomplianceservice011: 2.3.1. LogAuditEvent(action='DataRetentionJob', status='Failed', errorDetails)
+    end
+
+    note over scheduleractor, amazons3storage: REQ-MDGC-005 (Data Retention Policies) and REQ-MDGC-008 (Audit Trails) are addressed.
+
+    datagovernancecomplianceservice011--platformadministrationservice010: TaskExecutionStatus
+    deactivate datagovernancecomplianceservice011
+
+    platformadministrationservice010--scheduleractor: JobAccepted
+    deactivate platformadministrationservice010

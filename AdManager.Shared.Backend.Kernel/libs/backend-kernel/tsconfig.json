@@ -1,0 +1,38 @@
+```json
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@common/*": ["src/common/*"],
+      "@logging/*": ["src/logging/*"],
+      "@errors/*": ["src/errors/*"],
+      "@dtos/*": ["src/dtos/*"],
+      "@validation/*": ["src/validation/*"],
+      "@config/*": ["src/config/*"],
+      "@audit/*": ["src/audit/*"],
+      "@caching/*": ["src/caching/*"],
+      "@events/*": ["src/events/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}
+```

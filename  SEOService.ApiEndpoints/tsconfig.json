@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021", // Compatible with Node.js 20.15.0
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": false, // As per typical NestJS starter, can be true for stricter checks
+    "noImplicitAny": false,   // As per typical NestJS starter, can be true for stricter checks
+    "strictBindCallApply": false, // As per typical NestJS starter, can be true for stricter checks
+    "forceConsistentCasingInFileNames": false, // As per typical NestJS starter
+    "noFallthroughCasesInSwitch": false, // As per typical NestJS starter
+    "esModuleInterop": true, // Recommended for better interop with CommonJS modules
+    "resolveJsonModule": true // Allows importing JSON files
+  }
+}

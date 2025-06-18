@@ -1,0 +1,97 @@
+# Development environment specific overrides for campaign-management-service
+
+replicaCount: 1 # Typically 1 replica in development for resource conservation
+
+image:
+  # tag: "develop" # Or a specific feature branch tag, overridden by CI/CD
+  pullPolicy: "Always" # Ensures the latest image is pulled during development iterations
+
+# Lower resource requests and limits for development to conserve cluster resources
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+
+autoscaling:
+  enabled: false # HPA is usually not needed or enabled in development
+
+# Adjust probe settings for faster startup/feedback in dev, if necessary
+livenessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+startupProbe:
+  enabled: false # Typically not enabled for faster dev cycles unless app startup is very slow
+
+# Development-specific application configuration
+configData:
+  SERVICE_LOG_LEVEL: "debug"
+  KAFKA_BROKERS: "kafka-dev-service:9092" # Example: points to a dev Kafka
+  DATABASE_HOST: "postgres-dev.internal"
+  FEATURE_X_ENABLED: "true" # Enable a feature for dev testing
+  EXTERNAL_API_TIMEOUT_MS: "500"
+
+# Secret keys expected by the application.
+# Values are NOT stored here. They are injected externally via CI/CD, helm-secrets, or an operator.
+# This section defines which keys are expected for this environment.
+# Example:
+# secretKeys:
+#   - DATABASE_USER
+#   - DATABASE_PASSWORD
+#   - EXTERNAL_SERVICE_API_KEY
+
+# Alternatively, if using a mechanism like helm-secrets where values are provided securely at deploy time:
+secretData:
+  # These are placeholders. Actual base64 encoded values are supplied by the CI/CD pipeline
+  # or a secrets management tool (e.g., helm-secrets with sops).
+  # DO NOT COMMIT ACTUAL SECRET VALUES HERE.
+  DATABASE_USER: "cGxhY2Vob2xkZXItdXNlcg==" # "placeholder-user"
+  DATABASE_PASSWORD: "cGxhY2Vob2xkZXItcGFzc3dvcmQ=" # "placeholder-password"
+  EXTERNAL_SERVICE_API_KEY: "cGxhY2Vob2xkZXItYXBpa2V5" # "placeholder-apikey"
+
+# Environment variables specific to development
+env:
+  - name: NODE_ENV
+    value: "development"
+  - name: DEBUG_MODE
+    value: "true"
+  # Example of referencing a secret value in env:
+  # - name: DB_PASSWORD_FROM_ENV
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: {{ include "campaign-management-service.fullname" . }}-secret # Helm will resolve this
+  #       key: DATABASE_PASSWORD
+
+# Feature Toggles for development
+featureToggles:
+  enableIstioIntegration: false # Istio might be disabled in dev for simplicity or resource reasons
+  enablePrometheusServiceMonitors: true # May want to test monitoring setup in dev
+  deployDebugSidecarsInDev: true # Example: enable a debug sidecar only in dev
+
+# Ingress typically disabled for backend services if accessed via an API gateway or internal service calls
+ingress:
+  enabled: false
+  # If enabled for direct access in dev:
+  # className: "nginx-dev"
+  # hosts:
+  #   - host: campaign-management.dev.admanager.local
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+  # tls:
+  #   - hosts:
+  #       - campaign-management.dev.admanager.local
+  #     secretName: campaign-management-dev-tls # Assumes cert-manager handles this
+
+# Add any other development specific overrides below

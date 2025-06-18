@@ -1,0 +1,57 @@
+sequenceDiagram
+    participant "Monitored Resource" as monitoredresource
+    participant "Amazon CloudWatch Metrics" as awscloudwatchmetrics
+    participant "Amazon CloudWatch Alarms" as awscloudwatchalarms
+    participant "Amazon SNS" as awssns
+    participant "NotificationService" as notificationservice016
+    participant "Amazon SES" as awsses
+    participant "External PagerDuty" as externalpagerduty
+    actor "OnCall Personnel" as oncallpersonnelactor
+
+    monitoredresource-awscloudwatchmetrics: 1. PublishMetric(metricData: {name, value, dimensions, timestamp})
+    activate awscloudwatchmetrics
+    deactivate awscloudwatchmetrics
+
+    note over awscloudwatchalarms: AmazonCloudWatchAlarms continuously evaluates metrics. This interaction shows the state change and subsequent actions upon threshold breach.
+    awscloudwatchalarms-awscloudwatchalarms: 2. [Internally] Evaluate Metric from CloudWatch Metrics against Threshold
+    activate awscloudwatchalarms
+
+    alt isThresholdBreached == true
+        awscloudwatchalarms-awscloudwatchalarms: 3. ChangeStateTo('ALARM')
+        awscloudwatchalarms-awssns: 3.1. PublishToTopic('CriticalAlertsTopic', alarmNotification: {AlarmName, NewStateReason, MetricDetails, Timestamp})
+        activate awssns
+        note right of awssns: SNS Topic 'CriticalAlertsTopic' has multiple subscribers: NotificationService (via SQS or Lambda) and ExternalMonitoringPagerDuty (via HTTPS).
+        awssns--awscloudwatchalarms: 3.1. PublishConfirmation
+
+        awssns-notificationservice016: 3.2. FanOut: Event(alarmNotification) via SQS subscription or Lambda trigger
+        activate notificationservice016
+        note right of notificationservice016: NotificationService may use an SQS queue as a buffer for SNS messages to ensure reliable processing.
+        notificationservice016-notificationservice016: 3.2.1. ProcessAlarmNotification(alarmNotification)
+        activate notificationservice016
+        
+        alt EmailChannelConfigured
+            notificationservice016-awsses: 3.2.1.1.1. SendEmail(to: oncall_group, subject: 'Critical Alert', body: formattedAlarmDetails)
+            activate awsses
+            awsses--notificationservice016: 3.2.1.1.1. SendStatus
+            note over notificationservice016: Error handling: SNS provides retry mechanisms for delivery failures. SQS has DLQs. NotificationService should implement retries for SES calls.
+            awsses-oncallpersonnelactor: 3.2.1.1.2. Email Delivered: 'Critical Alert'
+            deactivate awsses
+        end
+        deactivate notificationservice016
+        deactivate notificationservice016
+
+        awssns-externalpagerduty: 3.3. FanOut: POST /webhook (alarmNotification) via HTTPS subscription
+        activate externalpagerduty
+        externalpagerduty--awssns: 3.3. HTTP 200 OK (async ack)
+
+        externalpagerduty-externalpagerduty: 3.3.1. CreateIncident(alarmNotification)
+        activate externalpagerduty
+        deactivate externalpagerduty
+
+        externalpagerduty-oncallpersonnelactor: 3.3.2. PagerDuty Notification (App, SMS, Call)
+        deactivate externalpagerduty
+
+        deactivate awssns
+    end
+
+    deactivate awscloudwatchalarms

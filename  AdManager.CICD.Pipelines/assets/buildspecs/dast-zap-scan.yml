@@ -1,0 +1,64 @@
+version: 0.2
+env:
+  variables:
+    # DAST_TARGET_URL will be passed as an environment variable to CodeBuild by the CDK pipeline definition
+    ZAP_IMAGE: "owasp/zap2docker-stable" # Or specific version e.g., owasp/zap2docker-stable:2.14.0
+    REPORT_DIR: "zap-reports"
+    REPORT_FILE_NAME_HTML: "zap_dast_report.html"
+    REPORT_FILE_NAME_JSON: "zap_dast_report.json"
+    REPORT_FILE_NAME_XML: "zap_dast_report.xml"
+    REPORT_FILE_NAME_MD: "zap_dast_warn.md"
+    # ZAP_OPTIONS: "- Fachwerk experimental -শনের" # Example ZAP options if needed
+
+phases:
+  install:
+    commands:
+      - echo "Ensuring Docker is available..."
+      - docker --version
+      - echo "Pulling OWASP ZAP Docker image: $ZAP_IMAGE"
+      - docker pull $ZAP_IMAGE
+      - mkdir -p $REPORT_DIR
+  build:
+    commands:
+      - echo "Starting DAST scan with OWASP ZAP against $DAST_TARGET_URL..."
+      # Example: ZAP Baseline Scan. This scan is quick and identifies some common vulnerabilities.
+      # For more comprehensive scans, consider ZAP Full Scan or API Scan with context configuration.
+      # The `|| true` allows the build to continue even if ZAP finds issues, so reports can be uploaded.
+      # Pipeline logic (e.g., a Lambda or another CodeBuild step) can later inspect reports and fail the pipeline.
+      # `$(pwd)` maps the current CodeBuild source directory to `/zap/wrk/` inside the container.
+      - docker run --rm \
+          -v $(pwd)/$REPORT_DIR:/zap/wrk/:rw \
+          $ZAP_IMAGE zap-baseline.py \
+          -t $DAST_TARGET_URL \
+          -g gen.conf \
+          -r $REPORT_FILE_NAME_HTML \
+          -w $REPORT_FILE_NAME_MD \
+          -J $REPORT_FILE_NAME_JSON \
+          -x $REPORT_FILE_NAME_XML \
+          ${ZAP_OPTIONS:-} || true
+
+      # To fail the build based on ZAP's exit code from zap-baseline.py:
+      # 0 = PASS, 1 = WARN, 2 = FAIL, 3 = ZAP ERROR
+      # To fail on WARN or FAIL (exit codes 1 or 2):
+      # Create a temporary file to store the exit code
+      # - > exitcode.txt
+      # - docker run --cidfile zap.cid ... (rest of the command without || true) || echo $? > exitcode.txt
+      # - ZAP_EXIT_CODE=$(cat exitcode.txt)
+      # - echo "ZAP Exit Code: $ZAP_EXIT_CODE"
+      # - if [ "$ZAP_EXIT_CODE" -gt "0" ]; then echo "DAST scan found issues (warnings or failures). Failing build."; exit 1; fi
+
+  post_build:
+    commands:
+      - echo "DAST scan completed. Reports generated in $REPORT_DIR."
+      - ls -l $REPORT_DIR
+
+artifacts:
+  files:
+    - "$REPORT_DIR/$REPORT_FILE_NAME_HTML"
+    - "$REPORT_DIR/$REPORT_FILE_NAME_JSON"
+    - "$REPORT_DIR/$REPORT_FILE_NAME_XML"
+    - "$REPORT_DIR/$REPORT_FILE_NAME_MD"
+  # base-directory: '.' # Reports are already in REPORT_DIR which is at root.
+  # If base-directory is set to REPORT_DIR, then files should be just the filenames.
+  # For simplicity, keeping files with $REPORT_DIR prefix and no base-directory for artifacts.
+  discard-paths: no

@@ -1,0 +1,65 @@
+sequenceDiagram
+    actor "Merchant" as MerchantActor
+    participant "External Third-Party App" as ExternalThirdPartyAppGenericAPI
+    participant "Ad Manager API Gateway" as admanagerapigateway019
+    participant "User Access Mgt. Service / OAuth Provider" as useraccessmanagementservice009
+    participant "Third-Party Connectivity Service" as thirdpartyconnectivityservice014
+    participant "Ad Manager Core Service" as relevantadmanagerservice
+
+    MerchantActor--ExternalThirdPartyAppGenericAPI: 1. Installs/Configures App & Initiates Ad Manager Connection
+    activate ExternalThirdPartyAppGenericAPI
+    ExternalThirdPartyAppGenericAPI--MerchantActor: App UI for OAuth flow authorization initiation
+    deactivate ExternalThirdPartyAppGenericAPI
+
+    note over ExternalThirdPartyAppGenericAPI,admanagerapigateway019: OAuth 2.0 Authorization Code Grant with PKCE is used for secure third-party app authorization (REQ-TCE-008). Merchant interaction for login/consent is part of step 2.1.1, typically via browser redirects not fully detailed in this service-level diagram.
+    ExternalThirdPartyAppGenericAPI--admanagerapigateway019: 2. [OAuth] Request Authorization (Directs Merchant's browser to /oauth/authorize with PKCE challenge)
+    activate admanagerapigateway019
+    admanagerapigateway019--useraccessmanagementservice009: 2.1. Forward Authorization Request
+    activate useraccessmanagementservice009
+    useraccessmanagementservice009--MerchantActor: 2.1.1. (If needed via browser) Prompt for Login & Consent
+    activate MerchantActor
+    MerchantActor--useraccessmanagementservice009: Credentials & Consent submitted
+    deactivate MerchantActor
+    useraccessmanagementservice009--admanagerapigateway019: Authorization Code or Error (to be returned via redirect)
+    deactivate useraccessmanagementservice009
+    admanagerapigateway019--ExternalThirdPartyAppGenericAPI: Login/Consent Page presented to Merchant (via browser)
+    deactivate admanagerapigateway019
+
+    useraccessmanagementservice009--ExternalThirdPartyAppGenericAPI: 3. [OAuth] Return Authorization Code (via redirecturi to App's backend)
+
+    ExternalThirdPartyAppGenericAPI--admanagerapigateway019: 4. [OAuth] Exchange Authorization Code for Tokens (POST /oauth/token with PKCE verifier)
+    activate admanagerapigateway019
+    admanagerapigateway019--useraccessmanagementservice009: 4.1. Validate Auth Code & Verifier, Issue Tokens
+    activate useraccessmanagementservice009
+    useraccessmanagementservice009--admanagerapigateway019: Access Token, Refresh Token details
+    deactivate useraccessmanagementservice009
+    admanagerapigateway019--ExternalThirdPartyAppGenericAPI: Access Token, Refresh Token
+    deactivate admanagerapigateway019
+
+    ExternalThirdPartyAppGenericAPI--admanagerapigateway019: 5. API Request (e.g., GET /v1/data) with Bearer Access Token
+    activate admanagerapigateway019
+    admanagerapigateway019--useraccessmanagementservice009: 5.1. [Token Auth] Validate Access Token
+    activate useraccessmanagementservice009
+    useraccessmanagementservice009--admanagerapigateway019: Token Valid / Invalid (Auth context)
+    deactivate useraccessmanagementservice009
+    note over admanagerapigateway019,thirdpartyconnectivityservice014: API Gateway may route API requests directly to relevantadmanagerservice for some whitelisted/internal third-party apps, bypassing ThirdPartyConnectivityService, based on specific configurations.
+    admanagerapigateway019--thirdpartyconnectivityservice014: 5.2. Forward Authorized API Request (if token valid)
+    activate thirdpartyconnectivityservice014
+    thirdpartyconnectivityservice014--relevantadmanagerservice: 5.2.1. Invoke Core Service Operation
+    activate relevantadmanagerservice
+    relevantadmanagerservice--thirdpartyconnectivityservice014: Processed Data/Status
+    deactivate relevantadmanagerservice
+    thirdpartyconnectivityservice014--admanagerapigateway019: Data/Status from Core Service
+    deactivate thirdpartyconnectivityservice014
+    admanagerapigateway019--ExternalThirdPartyAppGenericAPI: API Response (e.g., requested data)
+    deactivate admanagerapigateway019
+
+    relevantadmanagerservice-thirdpartyconnectivityservice014: 6. Business Event Occurs & Publish for Third-Party Notification (e.g., CampaignUpdated)
+    activate thirdpartyconnectivityservice014
+
+    note over thirdpartyconnectivityservice014,ExternalThirdPartyAppGenericAPI: Webhook system (REQ-TCE-008, 3.3.2.3) allows Ad Manager to push real-time updates to subscribed third-party apps. The app must acknowledge receipt.
+    thirdpartyconnectivityservice014--ExternalThirdPartyAppGenericAPI: 7. Send Webhook Event (POST to app's registered webhook URL with event payload)
+    activate ExternalThirdPartyAppGenericAPI
+    ExternalThirdPartyAppGenericAPI--thirdpartyconnectivityservice014: Webhook Acknowledgement (e.g., HTTP 200 OK)
+    deactivate ExternalThirdPartyAppGenericAPI
+    deactivate thirdpartyconnectivityservice014

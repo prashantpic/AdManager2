@@ -1,0 +1,44 @@
+{
+  "name": "admanager-unified-api-gateway-config",
+  "version": "1.0.0",
+  "description": "AWS CDK project for Ad Manager Unified API Gateway",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "lint": "eslint --ext .ts .",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.133.0",
+    "constructs": "^10.3.0",
+    "js-yaml": "^4.1.0",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@types/jest": "^29.5.12",
+    "@types/js-yaml": "^4.0.9",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.11.16",
+    "aws-cdk": "^2.133.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-prettier": "^5.1.3",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,86 @@
+sequenceDiagram
+    participant CorePlatformIntegrationService as coreplatformintegrationservice013
+    actor "[PlatformName] Core Product API" as ExternalCorePlatformProductAPI
+    participant "AdEventsQueue (ProductSync)" as adeventsqueue020
+    participant ProductCatalogService as productcatalogservice002
+    participant "AdManager PostgreSQL DB" as admanagerpostgresqldb022
+    participant "AdManager DynamoDB" as admanagerdynamodbtables023
+
+    coreplatformintegrationservice013-coreplatformintegrationservice013: 1. executeScheduledProductSync()
+    activate coreplatformintegrationservice013
+    note over coreplatformintegrationservice013: CorePlatformIntegrationService periodically fetches all product updates since the last successful sync time.
+
+    coreplatformintegrationservice013-ExternalCorePlatformProductAPI: 1.1 fetchUpdatedProducts(since_timestamp)
+    activate ExternalCorePlatformProductAPI
+    ExternalCorePlatformProductAPI--coreplatformintegrationservice013: 1.1 [ProductUpdateDTO]
+    deactivate ExternalCorePlatformProductAPI
+
+    loop For each ProductUpdateDTO
+        coreplatformintegrationservice013-coreplatformintegrationservice013: 1.2.1 transformToProductCoreDataUpdatedEvent(dto)
+        coreplatformintegrationservice013--coreplatformintegrationservice013: 1.2.1 ProductCoreDataUpdatedEvent
+        coreplatformintegrationservice013-adeventsqueue020: 1.2.2 publishEvent(ProductCoreDataUpdatedEvent)
+        activate adeventsqueue020
+        note right of adeventsqueue020: ProductCoreDataUpdatedEvent contains rich product information to minimize subsequent lookups by ProductCatalogService.
+        adeventsqueue020--coreplatformintegrationservice013: 1.2.2 PublishAcknowledgement
+        deactivate adeventsqueue020
+    end
+    deactivate coreplatformintegrationservice013
+
+    adeventsqueue020-productcatalogservice002: 2. delivers ProductCoreDataUpdatedEvent
+    activate productcatalogservice002
+
+    productcatalogservice002-productcatalogservice002: 2.1 validateEventSchema(event)
+    productcatalogservice002--productcatalogservice002: 2.1 ValidationResult
+
+    productcatalogservice002-admanagerpostgresqldb022: 2.2 queryProductOverrides(productId, merchantId)
+    activate admanagerpostgresqldb022
+    admanagerpostgresqldb022--productcatalogservice002: 2.2 [ProductOverrideData]
+    deactivate admanagerpostgresqldb022
+
+    productcatalogservice002-admanagerdynamodbtables023: 2.3 queryProductAdSpecificCustomizations(productId, merchantId)
+    activate admanagerdynamodbtables023
+    admanagerdynamodbtables023--productcatalogservice002: 2.3 [ProductCustomizationData]
+    deactivate admanagerdynamodbtables023
+
+    productcatalogservice002-productcatalogservice002: 2.4 applyOverridesAndCustomizations(coreData, overrides, customizations)
+    productcatalogservice002--productcatalogservice002: 2.4 MergedProductData
+
+    productcatalogservice002-productcatalogservice002: 2.5 resolveConflictsAndPrepareFinalData(mergedData) [REQ-PC-005]
+    note over productcatalogservice002: ProductCatalogService applies business logic for merging core data with Ad Manager specific overrides and customizations. Conflict resolution strategy (REQ-PC-005) is applied here (e.g., 'Ad Manager Overrides Win').
+    productcatalogservice002--productcatalogservice002: 2.5 FinalProductData
+
+    opt Begin Transaction for Catalog Update
+        note over productcatalogservice002: Updates to PostgreSQL (metadata) and DynamoDB (full details/feeds) should ideally be atomic. If one fails, compensation logic (e.g., rollback or marking inconsistent) should be triggered. This diagram shows a simplified failure handling for each step.
+        productcatalogservice002-admanagerpostgresqldb022: 2.6.1 upsertProductMetadata(finalProductData) [REQ-PC-002]
+        activate admanagerpostgresqldb022
+        admanagerpostgresqldb022--productcatalogservice002: 2.6.1 MetadataUpsertResult
+        deactivate admanagerpostgresqldb022
+
+        alt Metadata Upsert Fails
+            productcatalogservice002-productcatalogservice002: 2.6.2.1 handleCatalogUpdateFailure(error, 'Metadata')
+            productcatalogservice002-adeventsqueue020: 2.6.2.2 nackMessageOrMoveToDLQ(event)
+            activate adeventsqueue020
+            adeventsqueue020--productcatalogservice002: 2.6.2.2 Ack
+            deactivate adeventsqueue020
+        end
+
+        productcatalogservice002-admanagerdynamodbtables023: 2.6.3 upsertProductDetailsAndOverrides(finalProductData) [REQ-PC-002]
+        activate admanagerdynamodbtables023
+        admanagerdynamodbtables023--productcatalogservice002: 2.6.3 DetailsUpsertResult
+        deactivate admanagerdynamodbtables023
+
+        alt Details Upsert Fails
+            productcatalogservice002-productcatalogservice002: 2.6.4.1 handleCatalogUpdateFailure(error, 'Details')
+            productcatalogservice002--productcatalogservice002: 2.6.4.1 Rollback metadata if applicable
+            productcatalogservice002-adeventsqueue020: 2.6.4.2 nackMessageOrMoveToDLQ(event)
+            activate adeventsqueue020
+            adeventsqueue020--productcatalogservice002: 2.6.4.2 Ack
+            deactivate adeventsqueue020
+        end
+
+        productcatalogservice002-adeventsqueue020: 2.6.5 deleteMessage(messageHandle) [On Success]
+        activate adeventsqueue020
+        adeventsqueue020--productcatalogservice002: 2.6.5 DeleteAcknowledgement
+        deactivate adeventsqueue020
+    end
+    deactivate productcatalogservice002

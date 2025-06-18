@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package admanager.coreplatformintegration.service.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto"; // For StringValue if representing JSON as a string type
+
+message ProductSyncRequest {
+  string merchant_id = 1;
+  bool force_full_sync = 2;
+}
+
+message ProductSyncResponse {
+  string status = 1;
+  int32 products_synced = 2;
+  int32 conflicts_detected = 3;
+}
+
+message CoreProduct {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+  double price = 4;
+  optional string image_url = 5;
+  optional int32 stock_level = 6;
+  google.protobuf.Timestamp last_updated_at = 7;
+}
+
+message ProductConflictResolutionRequest {
+  string merchant_id = 1;
+  string product_id = 2;
+  string conflicting_field = 3;
+  string core_platform_value_json = 4; // Value as a JSON string
+  string ad_manager_override_value_json = 5; // Value as a JSON string
+  string resolution_strategy = 6;
+}
+
+message ProductConflictResolutionResponse {
+  string product_id = 1;
+  string resolution_status = 2;
+  optional string message = 3;
+}

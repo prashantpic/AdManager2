@@ -1,0 +1,63 @@
+sequenceDiagram
+    participant "ProductCatalogService" as productcatalogservice002
+    participant "AdManagerDynamoDB" as admanagerdynamodbtables023
+    participant "AdEventsQueue" as adeventsqueue020
+    participant "AdNetworkIntegrationService" as adnetworkintegrationservice003
+    actor "ExternalAdNetworkAPI" as ExternalAdNetworkGenericAPI
+
+    productcatalogservice002-productcatalogservice002: 1. initiateFeedGenerationAndSubmission(catalogId, adNetworkId)
+    activate productcatalogservice002
+
+    productcatalogservice002-admanagerdynamodbtables023: 2. fetchProductDataForFeed(catalogId, adNetworkFilters)
+    activate admanagerdynamodbtables023
+    admanagerdynamodbtables023--productcatalogservice002: productData
+    deactivate admanagerdynamodbtables023
+
+    note over productcatalogservice002: REQ-PC-006: ProductCatalogService generates feed. REQ-PC-007: ProductCatalogService validates feed.
+    productcatalogservice002-productcatalogservice002: 3. processAndFormatFeed(productData, adNetworkSpec)
+
+    productcatalogservice002-productcatalogservice002: 4. validateFeed(formattedFeed, adNetworkSpec)
+
+    alt 5. validationResult is SUCCESS
+        productcatalogservice002-productcatalogservice002: 5.1. storeFeedForSubmission(formattedFeed)
+
+        productcatalogservice002-adeventsqueue020: 5.2. publish(FeedReadyEvent {catalogId, adNetworkId, feedLocation})
+        activate adeventsqueue020
+
+        note over adnetworkintegrationservice003: Idempotency is crucial for FeedReadyEvent consumption by AdNetworkIntegrationService.
+        adeventsqueue020-adnetworkintegrationservice003: 5.3. consume(FeedReadyEvent)
+        deactivate adeventsqueue020
+        activate adnetworkintegrationservice003
+
+        adnetworkintegrationservice003-productcatalogservice002: 5.4. getFeedContent(feedLocation)
+        productcatalogservice002--adnetworkintegrationservice003: feedContent
+
+        note over adnetworkintegrationservice003: REQ-03-003: AdNetworkIntegrationService submits feed. Retry policies and circuit breakers apply to this external call.
+        adnetworkintegrationservice003-ExternalAdNetworkGenericAPI: 5.5. submitCatalogFeed(feedContent)
+        activate ExternalAdNetworkGenericAPI
+        ExternalAdNetworkGenericAPI--adnetworkintegrationservice003: submissionAttemptResponse {submissionId, initialStatus}
+        deactivate ExternalAdNetworkGenericAPI
+
+        adnetworkintegrationservice003-productcatalogservice002: 5.6. updateFeedSubmissionAttempt(catalogId, adNetworkId, submissionId, initialStatus)
+        productcatalogservice002--adnetworkintegrationservice003: ack
+
+        note right of adnetworkintegrationservice003: AdNetworkIntegrationService monitors submission status. This can be via polling (shown) or webhook from ad network.
+        loop 5.7. loop until finalStatus is SUCCESS or FAILED (with timeout)
+            adnetworkintegrationservice003-adnetworkintegrationservice003: 5.7.1. waitPollingInterval()
+            adnetworkintegrationservice003-ExternalAdNetworkGenericAPI: 5.7.2. getFeedProcessingStatus(submissionId)
+            activate ExternalAdNetworkGenericAPI
+            ExternalAdNetworkGenericAPI--adnetworkintegrationservice003: processingStatusResponse {currentStatus, details}
+            deactivate ExternalAdNetworkGenericAPI
+            adnetworkintegrationservice003-adnetworkintegrationservice003: 5.7.3. evaluateProcessingStatus(processingStatusResponse)
+        end
+
+        adnetworkintegrationservice003-productcatalogservice002: 5.8. updateFeedFinalStatus(catalogId, adNetworkId, submissionId, finalStatus, details)
+        productcatalogservice002--adnetworkintegrationservice003: ack
+        deactivate adnetworkintegrationservice003
+
+    else 6. else validationResult is FAILURE
+        productcatalogservice002-productcatalogservice002: 6.1. logValidationError(catalogId, adNetworkId, errors)
+        productcatalogservice002-productcatalogservice002: 6.2. notifyFeedValidationError(catalogId, adNetworkId, errors) // To Initiator/Admin
+    end
+
+    deactivate productcatalogservice002

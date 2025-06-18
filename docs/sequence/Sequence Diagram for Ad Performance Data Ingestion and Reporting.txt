@@ -1,0 +1,92 @@
+sequenceDiagram
+    actor "Ad Network Integration Service" as AdNetworkIntegrationService003
+    participant "External Ad Network API" as ExternalAdNetworkGenericAPI
+    participant "AdEventsTopic (SNS)" as AdEventsTopic021
+    participant "AnalyticsProcessingQueue (SQS)" as SqsAnalyticsQueue
+    actor "Analytics Reporting Service" as AnalyticsReportingService012
+    participant "PerformanceLogsDB (DynamoDB)" as AdManagerDynamodbTables023
+    participant "SummaryDB (PostgreSQL)" as AdManagerPostgresqlDb022
+    actor "Merchant Ad Manager Portal" as MerchantAdManagerPortalSpa018
+    participant "Ad Manager API Gateway" as AdManagerApiGateway019
+
+    %% Data Ingestion Flow
+    note over AdNetworkIntegrationService003: Periodic job within Ad Network Integration Service triggers data fetch.
+    activate AdNetworkIntegrationService003
+    loop 1. Periodic Data Ingestion (e.g., hourly/daily)
+        AdNetworkIntegrationService003-ExternalAdNetworkGenericAPI: 1.1 FetchPerformanceReport(dateRange, adNetworkConfig)
+        activate ExternalAdNetworkGenericAPI
+        ExternalAdNetworkGenericAPI--AdNetworkIntegrationService003: 1.2 PerformanceReportData
+        deactivate ExternalAdNetworkGenericAPI
+
+        AdNetworkIntegrationService003-AdNetworkIntegrationService003: 1.3 Validate & Transform Raw Report Data
+
+        AdNetworkIntegrationService003-AdEventsTopic021: 1.4 Publish(AdPerformanceDataIngestedEvent {rawMetrics})
+        activate AdEventsTopic021
+
+        AdEventsTopic021-SqsAnalyticsQueue: 1.5 Forward AdPerformanceDataIngestedEvent
+        deactivate AdEventsTopic021
+        activate SqsAnalyticsQueue
+
+        AnalyticsReportingService012-SqsAnalyticsQueue: 1.6 Poll/Receive AdPerformanceDataIngestedEvent
+        activate AnalyticsReportingService012
+        SqsAnalyticsQueue--AnalyticsReportingService012: 1.7 AdPerformanceDataIngestedEvent
+        deactivate SqsAnalyticsQueue
+
+        note over AnalyticsReportingService012: Data validation and transformation logic applied. ROAS/CPA calculations occur here (may depend on order data not shown in this diagram's scope as per defined participants).
+        AnalyticsReportingService012-AnalyticsReportingService012: 1.8 Process Raw Metrics (Normalize, Transform, Validate, Calculate Derived Metrics like ROAS/CPA)
+
+        note over AdManagerDynamodbTables023: Data stored in DynamoDB for detailed, granular performance metrics (REQ-ARP-007).
+        AnalyticsReportingService012-AdManagerDynamodbTables023: 1.9 StoreDetailedPerformanceLogs(ProcessedPerformanceData) [Write Repo Op]
+        activate AdManagerDynamodbTables023
+        AdManagerDynamodbTables023--AnalyticsReportingService012: 1.10 StoreLogsAck
+        deactivate AdManagerDynamodbTables023
+
+        note over AdManagerPostgresqlDb022: Summary data aggregated and stored in PostgreSQL, potentially within a transaction.
+        AnalyticsReportingService012-AdManagerPostgresqlDb022: 1.11 AggregateAndStoreSummary(ProcessedPerformanceData) [Write Repo Op, TX]
+        activate AdManagerPostgresqlDb022
+        AdManagerPostgresqlDb022--AnalyticsReportingService012: 1.12 StoreSummaryAck
+        deactivate AdManagerPostgresqlDb022
+        deactivate AnalyticsReportingService012
+    end
+    deactivate AdNetworkIntegrationService003
+
+    %% Report Retrieval Flow
+    MerchantAdManagerPortalSpa018-AdManagerApiGateway019: 2. GET /reports/campaignPerformance?params=...
+    activate MerchantAdManagerPortalSpa018
+    activate AdManagerApiGateway019
+
+    note over AdManagerApiGateway019: API Gateway handles authentication and authorization before forwarding to backend.
+    AdManagerApiGateway019-AdManagerApiGateway019: 2.1 Authenticate & Authorize Request
+
+    AdManagerApiGateway019-AnalyticsReportingService012: 2.2 getCampaignPerformanceReport(params)
+    activate AnalyticsReportingService012
+
+    AnalyticsReportingService012-AnalyticsReportingService012: 2.2.1 Check report cache for params
+
+    alt 2.2.2 Cache Miss
+        AnalyticsReportingService012-AdManagerPostgresqlDb022: 2.2.2.1 QuerySummaryData(params) [Read Repo Op]
+        activate AdManagerPostgresqlDb022
+        AdManagerPostgresqlDb022--AnalyticsReportingService012: 2.2.2.2 SummaryReportData
+        deactivate AdManagerPostgresqlDb022
+
+        opt 2.2.2.3 If detailed data needed for report
+            AnalyticsReportingService012-AdManagerDynamodbTables023: 2.2.2.3.1 QueryDetailedPerformanceLogs(params) [Read Repo Op]
+            activate AdManagerDynamodbTables023
+            AdManagerDynamodbTables023--AnalyticsReportingService012: 2.2.2.3.2 DetailedLogData
+            deactivate AdManagerDynamodbTables023
+        end
+
+        note over AnalyticsReportingService012: Report data is assembled from summary tables and optionally detailed logs based on report parameters.
+        AnalyticsReportingService012-AnalyticsReportingService012: 2.2.2.4 Assemble & Format ReportData from Summary (+Details)
+
+        AnalyticsReportingService012-AnalyticsReportingService012: 2.2.2.5 Store report in cache
+    else 2.2.3 Cache Hit
+        AnalyticsReportingService012-AnalyticsReportingService012: 2.2.3.1 Retrieve FormattedReportData from Cache
+    end
+
+    AnalyticsReportingService012--AdManagerApiGateway019: 2.3 FormattedReportData / CachedFormattedReportData
+    deactivate AnalyticsReportingService012
+
+    AdManagerApiGateway019--MerchantAdManagerPortalSpa018: 2.4 CampaignPerformanceReport
+    deactivate AdManagerApiGateway019
+    deactivate MerchantAdManagerPortalSpa018

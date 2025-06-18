@@ -1,0 +1,83 @@
+version: 0.2
+env:
+  variables:
+    # E2E_TARGET_URL will be passed as an environment variable to CodeBuild
+    # CYPRESS_INSTALL_BINARY: 0 # Example: if Cypress binary is cached or pre-installed to speed up
+    # NODE_ENV: "test" # Or "e2e"
+  parameter-store:
+    # EXAMPLE_API_KEY: "/myapp/e2e/api_key"
+    # EXAMPLE_USERNAME: "/myapp/e2e/username"
+    # EXAMPLE_PASSWORD: "/myapp/e2e/password"
+    LOGIN_USER_E2E: "/AdManager/E2E/TestUser/username"
+    LOGIN_PASSWORD_E2E: "/AdManager/E2E/TestUser/password"
+
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo Installing E2E test dependencies...
+      # Assuming E2E tests and their package.json are part of the service's source code
+      - npm ci # Or yarn install
+      # If using Cypress, install OS dependencies. This might vary based on the CodeBuild image.
+      # Standard Linux images (like aws/codebuild/standard:x.0) often have many of these.
+      # For amazonlinux2-x86_64-standard:x.0 based images:
+      - echo "Installing OS dependencies for headless browser if needed (e.g., Cypress)..."
+      # - yum install -y xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib
+      # The above is an example for Amazon Linux 2. For Ubuntu based images (like aws-linux-corretto-node):
+      # - apt-get update
+      # - apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 libxtst6 xauth xvfb
+      # Verify if Cypress needs these or if the chosen CodeBuild image already includes them.
+      # Often, `npx cypress install` or `npm run cypress:install` handles browser binaries.
+      # If using Playwright: npx playwright install --with-deps
+      - echo "Verifying Cypress installation (if applicable)..."
+      # - npx cypress verify # Example
+  pre_build:
+    commands:
+      - echo Starting Xvfb for headless browser tests if needed...
+      # This is often required for Cypress if not using Electron headlessly or Chrome/Edge built-in headless.
+      # - Xvfb :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+      # - export DISPLAY=:99
+      - echo "E2E Target URL: $E2E_TARGET_URL"
+      - echo "E2E Test User: $LOGIN_USER_E2E" # This will print the value from Parameter Store
+  build:
+    commands:
+      - echo Running E2E tests...
+      # Example for Cypress:
+      # Ensure your package.json has a script like "e2e:run": "cypress run"
+      # Pass E2E_TARGET_URL and other params as Cypress env vars or config overrides
+      - npm run e2e:run -- --config baseUrl=$E2E_TARGET_URL --env allure=true,grepTags=@smoke # Example with env vars for cypress
+      # Or direct command:
+      # - npx cypress run --config baseUrl=$E2E_TARGET_URL --env login_user=$LOGIN_USER_E2E,login_password=$LOGIN_PASSWORD_E2E
+      # Example for Playwright:
+      # - npx playwright test --headed (if Xvfb is used and UI interaction is debugged) or just `npx playwright test`
+      # Ensure E2E_TARGET_URL is used by tests, e.g. via process.env.E2E_TARGET_URL or playwright.config.ts baseURL
+  post_build:
+    commands:
+      - echo E2E tests completed.
+      # - echo "Stopping Xvfb..."
+      # - killall Xvfb || true
+      - echo "Listing E2E artifacts..."
+      - ls -R cypress/reports || true # Example path
+      - ls -R cypress/screenshots || true # Example path
+      - ls -R cypress/videos || true # Example path
+      - ls -R allure-results || true # Example for Allure reports
+
+artifacts: # Upload E2E test reports, videos, screenshots
+  files:
+    - 'cypress/reports/**/*' # Example for JUnit reports from Cypress Mochawesome
+    - 'cypress/videos/**/*'
+    - 'cypress/screenshots/**/*'
+    - 'allure-results/**/*' # Example for Allure reports
+    - 'playwright-report/**/*' # Example for Playwright HTML reports
+  # base-directory: '.' # Adjust if reports are in a specific sub-directory from root
+  discard-paths: no
+
+reports: # CodeBuild native test reporting
+  E2EReportGroup: # This name should match a cdk.aws_codebuild.ReportGroup resource name or ARN
+    files:
+      - 'cypress/reports/junit/**/*.xml' # Example for JUnit reports from Cypress (e.g. using cypress-multi-reporters with junit)
+      # - 'playwright-report/junit-results.xml' # Example for Playwright with JUnit reporter
+    file-format: 'JUNITXML'
+    base-directory: '.' # Relative to the root of the repository

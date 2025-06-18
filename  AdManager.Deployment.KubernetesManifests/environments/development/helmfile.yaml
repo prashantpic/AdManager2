@@ -1,0 +1,83 @@
+# Helmfile definition for orchestrating the deployment of all Ad Manager applications
+# and services to the Development environment.
+
+# Optional: Define common repositories if charts are not local or from standard repos.
+# repositories:
+#   - name: bitnami
+#     url: https://charts.bitnami.com/bitnami
+
+# Environment specific global values. These values are available to all releases.
+environments:
+  default: # Default environment settings for this helmfile.yaml
+    values:
+      - ./global-values.yaml # Load global values defined for the development environment
+    # You can also add specific key-value pairs here that apply to all releases
+    # e.g., global:
+    #         anotherGlobalDevSetting: "value"
+
+# Define the releases (Helm charts) to be deployed in the development environment.
+releases:
+  # Backend Services
+  - name: campaign-management-service # Name of the Helm release
+    namespace: admanager-services-dev # Target Kubernetes namespace for this service
+    chart: ../../charts/campaign-management-service # Path to the local Helm chart
+    # version: 0.1.0 # Optional: Pin to a specific chart version
+    values:
+      - ./campaign-management-service-values.yaml # Environment-specific values for this service
+      # - campaign-management-service-secrets.yaml # If using helm-secrets and keeping decrypted file locally (NOT RECOMMENDED for Git)
+    # secrets: # Example for helm-secrets plugin with SOPS encrypted files
+      # - ./secrets/campaign-management-service-secrets.sops.yaml
+    # wait: true # Optional: Wait for resources to be ready before proceeding
+    # timeout: 300 # Optional: Timeout for Helm operations
+
+  # Add other backend services here, for example:
+  # - name: user-profile-service
+  #   namespace: admanager-services-dev
+  #   chart: ../../charts/user-profile-service
+  #   values:
+  #     - ./user-profile-service-values.yaml
+  #   # secrets:
+  #     # - ./secrets/user-profile-service-secrets.sops.yaml
+
+  # Frontend Applications
+  - name: merchant-ad-manager-portal
+    namespace: admanager-frontend-dev # Target Kubernetes namespace for this frontend
+    chart: ../../charts/merchant-ad-manager-portal
+    values:
+      - ./merchant-ad-manager-portal-values.yaml # Environment-specific values for the portal
+    # secrets:
+      # - ./secrets/merchant-ad-manager-portal-secrets.sops.yaml
+
+  # Supporting Services / Infrastructure components (if managed via Helmfile)
+  # Example: A development instance of Redis
+  # - name: redis-dev
+  #   namespace: admanager-infra-dev
+  #   chart: bitnami/redis # Assuming 'bitnami' repo is defined above
+  #   version: "17.x.x"
+  #   values:
+  #     - auth:
+  #         enabled: false
+  #     - replica:
+  #         replicaCount: 1
+
+# You can also define hooks for pre/post deploy scripts or other actions.
+# hooks:
+#  - name: "notify-slack-pre-sync"
+#    events: ["presync"]
+#    command: "./scripts/notify.sh"
+#    args: ["Development sync starting..."]
+
+#  - name: "run-db-migrations"
+#    events: ["postupgrade"] # Runs after a successful upgrade of a release with this hook
+#    showlogs: true
+#    command: "kubectl"
+#    args:
+#      - "exec"
+#      - "-n"
+#      - "admanager-services-dev"
+#      - "deploy/campaign-management-service" # Adjust to your deployment name
+#      - "--"
+#      - "npm"
+#      - "run"
+#      - "db:migrate"
+#    # This hook would typically be part of a specific release that needs migrations, not global.

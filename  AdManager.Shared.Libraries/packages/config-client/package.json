@@ -1,0 +1,27 @@
+{
+  "name": "@admanager/config-client",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rimraf dist && tsc -p tsconfig.build.json",
+    "test": "jest --config ../../jest.config.js --rootDir .",
+    "lint": "eslint src --ext .ts",
+    "clean": "rimraf dist node_modules",
+    "clean:dist": "rimraf dist"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.525.0",
+    "@aws-sdk/client-secrets-manager": "^3.525.0",
+    "dotenv": "^16.4.5"
+  },
+  "peerDependencies": {
+    "@admanager/types": "0.1.0",
+    "@admanager/logger": "0.1.0",
+    "@admanager/errors": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  }
+}

@@ -1,0 +1,122 @@
+sequenceDiagram
+    actor "Developer" as actordeveloper
+    participant "External SCM (Git)" as ExternalSourceControlGit
+    participant "CI/CD Orchestrator (CodePipeline)" as ExternalCICDSystem
+    participant "Build Service (CodeBuild)" as operationsmonitoringlayerconfig030
+    participant "SAST Tool (SonarQube)" as sasttoolsonarqube
+    participant "Container Registry (ECR)" as containerregistryecr
+    participant "Image Vulnerability Scanner" as imagevulnerabilityscanner
+    participant "Deployment System (CodeDeploy/EKS Ctrl)" as deploymentsystemcodedeployeks
+    participant "Secrets Manager Client" as securitylayersecretsmanagerclient028
+    participant "Container Orchestrator (EKS API)" as AmazonEKS
+
+    actordeveloper-ExternalSourceControlGit: 1. pushCodeChanges(branch, commit)
+    activate actordeveloper
+    activate ExternalSourceControlGit
+    ExternalSourceControlGit--actordeveloper: ackPushSuccess()
+    deactivate actordeveloper
+
+    ExternalSourceControlGit-ExternalCICDSystem: 2. notifyCodeChange(repository, branch, commitId)
+    deactivate ExternalSourceControlGit
+    activate ExternalCICDSystem
+
+    ExternalCICDSystem-operationsmonitoringlayerconfig030: 3. triggerBuild(commitId, buildSpec)
+    activate operationsmonitoringlayerconfig030
+
+    operationsmonitoringlayerconfig030-ExternalSourceControlGit: 3.1. checkoutCode(commitId)
+    activate ExternalSourceControlGit
+    ExternalSourceControlGit--operationsmonitoringlayerconfig030: sourceCode
+    deactivate ExternalSourceControlGit
+
+    operationsmonitoringlayerconfig030-operationsmonitoringlayerconfig030: 3.2. fetchDependencies()
+    operationsmonitoringlayerconfig030-operationsmonitoringlayerconfig030: 3.3. runLinters()
+
+    alt If Lint Failed
+        operationsmonitoringlayerconfig030-ExternalCICDSystem: 3.3.1. notifyBuildFailure(linterrors)
+        note right of operationsmonitoringlayerconfig030: Conditional: Only if linters fail. Pipeline stops here for this execution.
+    else If Lint Passed
+        operationsmonitoringlayerconfig030-operationsmonitoringlayerconfig030: 3.4. runUnitTests()
+        
+        alt If Unit Tests Failed
+            operationsmonitoringlayerconfig030-ExternalCICDSystem: 3.4.1. notifyBuildFailure(testerrors)
+            note right of operationsmonitoringlayerconfig030: Conditional: Only if unit tests fail. Pipeline stops here.
+        else If Tests Passed
+            operationsmonitoringlayerconfig030-sasttoolsonarqube: 3.5. analyzeCode(sourceCode)
+            activate sasttoolsonarqube
+            note over sasttoolsonarqube: SAST Scan: Static Application Security Testing for code vulnerabilities.
+            sasttoolsonarqube--operationsmonitoringlayerconfig030: sastReport (Pass/Fail)
+            deactivate sasttoolsonarqube
+
+            alt If SAST Failed
+                operationsmonitoringlayerconfig030-ExternalCICDSystem: 3.5.1. notifyBuildFailure(sastviolations)
+                note right of operationsmonitoringlayerconfig030: Conditional: Only if SAST scan fails policy. Pipeline stops here.
+            else If SAST Passed
+                operationsmonitoringlayerconfig030-operationsmonitoringlayerconfig030: 3.6. buildDockerImage(Dockerfile, sourceCode)
+                
+                operationsmonitoringlayerconfig030-imagevulnerabilityscanner: 3.7. scanDockerImage(dockerImageIdLocal)
+                activate imagevulnerabilityscanner
+                note over imagevulnerabilityscanner: Image Scan: Checks Docker image for known vulnerabilities in OS packages and libraries.
+                imagevulnerabilityscanner--operationsmonitoringlayerconfig030: vulnerabilityReport (Pass/Fail)
+                deactivate imagevulnerabilityscanner
+
+                alt If Vulnerability Scan Failed
+                    operationsmonitoringlayerconfig030-ExternalCICDSystem: 3.7.1. notifyBuildFailure(vulnerabilities)
+                    note right of operationsmonitoringlayerconfig030: Conditional: Only if vulnerability scan fails policy. Pipeline stops here.
+                else If Vulnerability Scan Passed
+                    operationsmonitoringlayerconfig030-containerregistryecr: 3.8. pushDockerImage(dockerImageIdLocal, imageTag)
+                    activate containerregistryecr
+                    containerregistryecr--operationsmonitoringlayerconfig030: imageECRURI
+                    deactivate containerregistryecr
+
+                    operationsmonitoringlayerconfig030-ExternalCICDSystem: 3.9. notifyBuildSuccess(imageECRURI, artifactDetails)
+                end
+            end
+        end
+    end
+    deactivate operationsmonitoringlayerconfig030
+    
+    alt If Build Succeeded
+        ExternalCICDSystem-deploymentsystemcodedeployeks: 4. triggerDeployment(imageECRURI, deploymentConfig)
+        activate deploymentsystemcodedeployeks
+        
+        deploymentsystemcodedeployeks-securitylayersecretsmanagerclient028: 4.1. fetchDeploymentSecrets(secretNames)
+        activate securitylayersecretsmanagerclient028
+        securitylayersecretsmanagerclient028--deploymentsystemcodedeployeks: secrets
+        deactivate securitylayersecretsmanagerclient028
+        
+        note over deploymentsystemcodedeployeks: Deployment strategy (e.g., Blue/Green, Canary, Rolling Update) is configured in the Deployment System.
+        deploymentsystemcodedeployeks-AmazonEKS: 4.2. updateService(serviceName, imageECRURI, secrets, deploymentStrategy)
+        activate AmazonEKS
+        
+        loop Manage Pod Lifecycle
+            AmazonEKS-AmazonEKS: 4.2.1. Manage Pod Lifecycle (Pull Image, Stop Old, Start New)
+            note right of AmazonEKS: Internal EKS process: rolling update, blue/green, etc.
+        end
+        
+        AmazonEKS-AmazonEKS: 4.2.2. runHealthChecksOnNewPods()
+        AmazonEKS--deploymentsystemcodedeployeks: deploymentStatusInitiated
+        deactivate AmazonEKS
+        
+        alt If EKS reports pods healthy
+            deploymentsystemcodedeployeks-deploymentsystemcodedeployeks: 4.3. performSmokeTests()
+            
+            alt If Smoke Tests Failed or Health Checks Failed
+                note right of deploymentsystemcodedeployeks: Conditional: Only if smoke tests or pod health checks fail.
+                deploymentsystemcodedeployeks-AmazonEKS: 4.3.1. initiateRollback()
+                activate AmazonEKS
+                AmazonEKS--deploymentsystemcodedeployeks: rollbackStatus
+                deactivate AmazonEKS
+                
+                deploymentsystemcodedeployeks-ExternalCICDSystem: 4.3.2. notifyDeploymentFailure(reason)
+                note right of deploymentsystemcodedeployeks: Conditional: Pipeline deployment stage failed.
+            else If Smoke Tests Passed
+                deploymentsystemcodedeployeks-ExternalCICDSystem: 4.4. notifyDeploymentSuccess()
+            end
+        end
+        deactivate deploymentsystemcodedeployeks
+    end
+    
+    ExternalCICDSystem-ExternalCICDSystem: 5. Finalize Pipeline Run (Log status, cleanup)
+    deactivate ExternalCICDSystem
+
+    note over actordeveloper,Amazon_EKS: This diagram illustrates a typical CI/CD pipeline. Specific tools and steps may vary.

@@ -1,0 +1,33 @@
+{
+  "name": "admanager-shared-libraries",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Monorepo for AdManager shared libraries",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "bootstrap": "npm install",
+    "build": "npm run build -ws --if-present",
+    "test": "npm run test -ws --if-present",
+    "lint": "npm run lint -ws --if-present",
+    "clean": "npm run clean -ws --if-present && rimraf node_modules",
+    "clean:dist": "npm run clean:dist -ws --if-present"
+  },
+  "devDependencies": {
+    "typescript": "5.3.3",
+    "jest": "29.7.0",
+    "ts-jest": "29.1.2",
+    "@types/jest": "29.5.12",
+    "eslint": "8.57.0",
+    "@typescript-eslint/parser": "7.1.0",
+    "@typescript-eslint/eslint-plugin": "7.1.0",
+    "prettier": "3.2.5",
+    "rimraf": "5.0.5",
+    "lerna": "^8.1.2"
+  },
+  "engines": {
+    "node": ">=20.14.0",
+    "npm": ">=10.0.0"
+  }
+}

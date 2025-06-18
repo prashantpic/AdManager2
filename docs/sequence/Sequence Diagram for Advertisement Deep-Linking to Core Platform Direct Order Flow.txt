@@ -1,0 +1,41 @@
+sequenceDiagram
+    actor "User Device (Browser)" as ExternalUserDevice
+    participant "External Ad Platform (e.g., Google/Facebook)" as ExternalAdPlatformUserInterface
+    participant "Ad Manager: Campaign Service (Click Tracker)" as campaign-management-service-001
+    participant "[PlatformName] Core: Direct Order UI" as ExternalCorePlatformDirectOrderUI
+    participant "MessageQueue SystemEvents" as MessageQueueSystemEvents
+
+    activate ExternalUserDevice
+    ExternalUserDevice-ExternalAdPlatformUserInterface: 1. User clicks advertisement for Product Y
+    activate ExternalAdPlatformUserInterface
+    note over ExternalUserDevice,ExternalAdPlatformUserInterface: The Ad Manager Tracking URL (step 2) is configured during ad campaign setup (REQ 3.1.2). This URL allows Ad Manager to record the click before redirecting.
+    ExternalAdPlatformUserInterface--ExternalUserDevice: 2. Instructs browser to navigate to Ad Manager Tracking URL (e.g., https://admanager.platform/track?adid=X&prodid=Y)
+    deactivate ExternalAdPlatformUserInterface
+
+    ExternalUserDevice-campaign-management-service-001: 3. HTTP GET /track?adid=X&prodid=Y (Ad Manager Tracking URL)
+    activate campaign-management-service-001
+
+    loop 4. Process Click: Validate parameters, Log click event details
+        campaign-management-service-001-MessageQueueSystemEvents: 4.1. Publish AdClickedEvent (adid=X, prodid=Y, timestamp) for async analytics processing
+        note right of campaign-management-service-001: MessageQueueSystemEvents is a conceptual representation of the messaging system (e.g., SQS/SNS) used for asynchronous tasks.
+    end
+
+    campaign-management-service-001-campaign-management-service-001: 5. Retrieve pre-configured Direct Order deep-link URL for Product Y
+
+    campaign-management-service-001--ExternalUserDevice: 6. HTTP 302 Redirect to Direct Order URL
+    deactivate campaign-management-service-001
+
+    ExternalUserDevice-ExternalCorePlatformDirectOrderUI: 7. HTTP GET /direct-order?productid=Y&source=admanager (Deep-link to Core Platform)
+    activate ExternalCorePlatformDirectOrderUI
+
+    ExternalCorePlatformDirectOrderUI--ExternalUserDevice: 8. HTTP 200 OK (Renders [PlatformName] Core Direct Order page for Product Y)
+
+    note over ExternalCorePlatformDirectOrderUI: The actual purchase processing (payment, order creation) happens within the [PlatformName] Core Platform and is abstracted here.
+    loop 9. User interacts with Direct Order UI (enters details, confirms purchase)
+        ExternalUserDevice-ExternalCorePlatformDirectOrderUI: Submits details and confirms purchase
+        ExternalCorePlatformDirectOrderUI--ExternalUserDevice: Various UI updates and intermediate responses
+    end
+
+    ExternalCorePlatformDirectOrderUI--ExternalUserDevice: 10. HTTP 200 OK (Displays Purchase Confirmation)
+    deactivate ExternalCorePlatformDirectOrderUI
+    deactivate ExternalUserDevice

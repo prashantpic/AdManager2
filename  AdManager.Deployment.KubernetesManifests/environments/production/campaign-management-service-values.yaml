@@ -1,0 +1,121 @@
+# Production environment specific overrides for campaign-management-service
+
+replicaCount: 3 # Higher replica count for production resilience and load handling
+
+image:
+  # tag: "stable-v1.2.3" # Specific stable tag, overridden by CI/CD with the release version
+  pullPolicy: "IfNotPresent" # Ensures image is pulled if not locally available on the node
+
+# Production-grade resource requests and limits
+resources:
+  requests:
+    cpu: "200m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 75 # Optional: also scale on memory
+
+# Probe settings for production (more conservative)
+livenessProbe:
+  initialDelaySeconds: 60 # Allow more time for application to start
+  periodSeconds: 20
+  timeoutSeconds: 10
+  failureThreshold: 5
+
+readinessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+startupProbe:
+  enabled: true # Recommended for applications that might take time to initialize fully
+  httpGet:
+    path: /api/v1/health/startup # Ensure this path exists and indicates full startup
+    port: http
+  failureThreshold: 60 # e.g. 60 * 10s = 10 minutes max startup time
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# Production-specific application configuration
+configData:
+  SERVICE_LOG_LEVEL: "info" # Less verbose logging in production
+  KAFKA_BROKERS: "kafka-prod-service.kafka.svc.cluster.local:9092" # Points to production Kafka
+  DATABASE_HOST: "postgres-prod.rds.amazonaws.com"
+  FEATURE_X_ENABLED: "true" # A feature that is stable for production
+  EXTERNAL_API_TIMEOUT_MS: "2000" # Potentially higher timeout for external services
+
+# Secret keys expected by the application.
+# Values are NOT stored here. They are injected externally via CI/CD, helm-secrets, or an operator.
+# This section defines which keys are expected for this environment.
+# secretKeys:
+#   - DATABASE_USER
+#   - DATABASE_PASSWORD
+#   - EXTERNAL_SERVICE_API_KEY
+#   - PAYMENT_GATEWAY_SECRET
+
+secretData:
+  # These are placeholders. Actual base64 encoded values are supplied by the CI/CD pipeline
+  # or a secrets management tool (e.g., helm-secrets with sops, ExternalSecrets operator).
+  # DO NOT COMMIT ACTUAL SECRET VALUES HERE.
+  DATABASE_USER: "PRODUCTION_DB_USER_PLACEHOLDER_B64"
+  DATABASE_PASSWORD: "PRODUCTION_DB_PASS_PLACEHOLDER_B64"
+  EXTERNAL_SERVICE_API_KEY: "PRODUCTION_API_KEY_PLACEHOLDER_B64"
+  PAYMENT_GATEWAY_SECRET: "PROD_PAYMENT_SECRET_PLACEHOLDER_B64"
+
+# Environment variables specific to production
+env:
+  - name: NODE_ENV
+    value: "production"
+  - name: SENSITIVE_OPERATION_CONFIRMATION
+    value: "required"
+
+# Feature Toggles for production
+featureToggles:
+  enableIstioIntegration: true # Istio might be enabled in production for advanced traffic management/security
+  enablePrometheusServiceMonitors: true # Essential for monitoring in production
+  deployDebugSidecarsInDev: false # Debug sidecars should not be deployed in production
+
+# Ingress typically disabled for backend services if accessed via an API gateway
+ingress:
+  enabled: false # If this service is purely internal or accessed via an API Gateway Ingress
+
+# Production specific pod annotations, security contexts, etc.
+podAnnotations:
+  iam.amazonaws.com/role: "arn:aws:iam::ACCOUNT_ID:role/CampaignManagementServiceProdRole" # Example for IRSA
+
+podSecurityContext:
+  fsGroup: 1001
+
+securityContext:
+  runAsUser: 1001
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector:
+  # Ensure pods run on nodes optimized for this workload type if applicable
+  workload-type: "backend-services"
+
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - {{ include "campaign-management-service.name" . }}
+        topologyKey: "kubernetes.io/hostname"

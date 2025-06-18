@@ -1,0 +1,201 @@
+openapi: 3.1.0
+info:
+  title: Ad Manager Affiliate API
+  version: v1
+  description: API for Affiliate Portal functionalities, including dashboard, payouts, and link generation.
+  contact:
+    name: Ad Manager Affiliate Support
+    email: affiliates@admanager.example.com
+
+servers:
+  - url: https://{stage}.api.admanager.example.com/affiliate/v1
+    variables:
+      stage:
+        default: dev
+        description: The deployment stage (e.g., dev, prod).
+  - url: http://localhost:3000/affiliate/v1 # For local development if proxied
+    description: Local development server
+
+tags:
+  - name: Dashboard
+    description: Affiliate dashboard data.
+  - name: Payouts
+    description: Affiliate payout information.
+  - name: Tracking Links
+    description: Generation and management of affiliate tracking links.
+
+paths:
+  /dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Get affiliate dashboard data
+      description: Retrieves key performance indicators and summaries for the authenticated affiliate.
+      operationId: getAffiliateDashboard
+      parameters:
+        - name: period
+          in: query
+          description: Time period for dashboard data (e.g., 'last7days', 'last30days', 'monthToDate').
+          required: false
+          schema:
+            type: string
+            default: 'last30days'
+        - $ref: './shared-components.yaml#/components/parameters/CorrelationIdHeader'
+      security:
+        - JWTBearerAuth: [] # Scope for affiliate might be checked in authorizer/backend
+      responses:
+        '200':
+          description: Affiliate dashboard data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AffiliateDashboard'
+        '401':
+          $ref: './shared-components.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: './shared-components.yaml#/components/responses/ForbiddenError'
+        '500':
+          $ref: './shared-components.yaml#/components/responses/InternalServerError'
+
+  /payouts:
+    get:
+      tags:
+        - Payouts
+      summary: List affiliate payouts
+      description: Retrieves a paginated list of payout records for the authenticated affiliate.
+      operationId: listAffiliatePayouts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - $ref: './shared-components.yaml#/components/parameters/CorrelationIdHeader'
+      security:
+        - JWTBearerAuth: []
+      responses:
+        '200':
+          description: A paginated list of affiliate payouts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AffiliatePayout'
+                  pageInfo:
+                    $ref: './shared-components.yaml#/components/schemas/PaginationInfo'
+        '401':
+          $ref: './shared-components.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: './shared-components.yaml#/components/responses/ForbiddenError'
+        '500':
+          $ref: './shared-components.yaml#/components/responses/InternalServerError'
+
+  /tracking-links:
+    get:
+      tags:
+        - Tracking Links
+      summary: List affiliate tracking links
+      description: Retrieves available tracking links for the affiliate.
+      operationId: listAffiliateTrackingLinks
+      parameters:
+        - $ref: './shared-components.yaml#/components/parameters/CorrelationIdHeader'
+      security:
+        - JWTBearerAuth: []
+      responses:
+        '200':
+          description: A list of tracking links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AffiliateTrackingLink'
+        '401':
+          $ref: './shared-components.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: './shared-components.yaml#/components/responses/ForbiddenError'
+        '500':
+          $ref: './shared-components.yaml#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    AffiliateDashboard:
+      type: object
+      properties:
+        totalClicks:
+          type: integer
+        totalConversions:
+          type: integer
+        conversionRate:
+          type: number
+          format: double
+        earnedCommission:
+          type: number
+          format: double
+        pendingCommission:
+          type: number
+          format: double
+        # Add other relevant dashboard fields
+
+    AffiliatePayout:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        payoutDate:
+          type: string
+          format: date-time
+        amount:
+          type: number
+          format: double
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, PAID, FAILED]
+        method:
+          type: string # e.g., PayPal, Bank Transfer
+      required:
+        - id
+        - payoutDate
+        - amount
+        - status
+
+    AffiliateTrackingLink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: A descriptive name for the link or campaign it's for.
+        url:
+          type: string
+          format: url
+          description: The actual tracking URL.
+        campaignId: # Optional, if link is tied to a specific merchant campaign
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - id
+        - name
+        - url
+
+    ErrorResponse:
+      $ref: './shared-components.yaml#/components/schemas/ErrorResponse'
+    PaginationInfo:
+      $ref: './shared-components.yaml#/components/schemas/PaginationInfo'
+
+  securitySchemes:
+    JWTBearerAuth:
+      $ref: './shared-components.yaml#/components/securitySchemes/JWTBearerAuth'

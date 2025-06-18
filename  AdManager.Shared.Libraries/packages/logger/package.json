@@ -1,0 +1,24 @@
+{
+  "name": "@admanager/logger",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rimraf dist && tsc -p tsconfig.build.json",
+    "test": "jest --config ../../jest.config.js --rootDir .",
+    "lint": "eslint src --ext .ts",
+    "clean": "rimraf dist node_modules",
+    "clean:dist": "rimraf dist"
+  },
+  "dependencies": {
+    "pino": "^8.19.0"
+  },
+  "devDependencies": {
+    "pino-pretty": "^10.3.1"
+  },
+  "peerDependencies": {},
+  "publishConfig": {
+    "access": "restricted"
+  }
+}

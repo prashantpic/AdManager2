@@ -1,0 +1,141 @@
+replicaCount: 1
+
+image:
+  repository: my-docker-registry/campaign-management-service
+  pullPolicy: IfNotPresent
+  # Overridden by CI/CD with specific build tag
+  tag: "latest"
+
+imagePullSecrets: []
+# - name: my-image-pull-secret
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80 # The port the service will expose
+  targetPort: http # The name or number of the port on the pods targeted by the service, e.g., 3000 for a NestJS app
+
+ingress:
+  enabled: false # Typically backend services are not directly exposed via Ingress, but through an API Gateway
+  className: "" # e.g., "alb" for AWS Load Balancer Controller or "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: campaign-service.local
+      paths:
+        - path: /api/v1/campaigns # Example path
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: campaign-service-tls
+  #    hosts:
+  #      - campaign-service.local
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 512Mi
+  # requests:
+  #   cpu: 250m
+  #   memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80 # Optional
+
+# Liveness, Readiness, and Startup Probes for a NestJS backend
+livenessProbe:
+  httpGet:
+    path: /api/v1/health/live # Standard NestJS health endpoint
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /api/v1/health/ready # Standard NestJS health endpoint
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+startupProbe:
+  enabled: true # Enable if your NestJS app has a longer startup time
+  httpGet:
+    path: /api/v1/health/live # Or a specific startup-ready endpoint
+    port: http
+  failureThreshold: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# ConfigMap data for application-level settings (non-sensitive)
+configData: {}
+  # KAFKA_BROKERS: "kafka-service:9092"
+  # SQS_QUEUE_URL: "https://sqs.region.amazonaws.com/123456789012/my-queue"
+  # LOG_LEVEL: "info"
+
+# Secret keys (values to be provided externally)
+# These keys will be used to create Secret entries.
+# Actual values are injected by CI/CD or a secrets operator.
+secretKeys: []
+  # - DATABASE_URL
+  # - KAFKA_API_KEY
+  # - KAFKA_API_SECRET
+  # - AD_NETWORK_API_KEY
+
+# Alternative: direct secret data (values still provided externally and base64 encoded)
+# secretData: {}
+  # DATABASE_URL: "base64_encoded_db_url_placeholder"
+  # AD_NETWORK_API_KEY: "base64_encoded_api_key_placeholder"
+
+# Environment variables to be set in the container
+# Can be direct values, or from ConfigMaps/Secrets
+env: []
+  # - name: NODE_ENV
+  #   value: "production" # This might be overridden per environment
+  # - name: KAFKA_BROKERS_FROM_CM # Example sourcing from ConfigMap
+  #   valueFrom:
+  #     configMapKeyRef:
+  #       name: {{ include "campaign-management-service.fullname" . }}-config
+  #       key: KAFKA_BROKERS
+  # - name: DATABASE_URL_FROM_SECRET # Example sourcing from Secret
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: {{ include "campaign-management-service.fullname" . }}-secret
+  #       key: DATABASE_URL
+
+featureToggles:
+  enableIstioIntegration: false
+  enablePrometheusServiceMonitors: false
+  # deployDebugSidecarsInDev is usually an environment-specific override, not a chart default.
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,115 @@
+```protobuf
+syntax = "proto3";
+
+package AdManager.Common.V1;
+
+option csharp_namespace = "AdManager.Common.V1.Grpc";
+
+enum AdNetworkType {
+  AD_NETWORK_TYPE_UNSPECIFIED = 0;
+  GOOGLE_ADS = 1;
+  INSTAGRAM_ADS = 2; // (Facebook Marketing API)
+  TIKTOK_ADS = 3;
+  SNAPCHAT_ADS = 4;
+}
+
+enum CampaignStatus {
+  CAMPAIGN_STATUS_UNSPECIFIED = 0;
+  DRAFT = 1;
+  ACTIVE = 2;
+  PAUSED = 3;
+  ARCHIVED = 4;
+  REMOVED = 5; // Or Deleted
+  PENDING_REVIEW = 6;
+  REJECTED = 7;
+}
+
+enum AdSetStatus {
+  AD_SET_STATUS_UNSPECIFIED = 0;
+  DRAFT = 1;
+  ACTIVE = 2;
+  PAUSED = 3;
+  ARCHIVED = 4;
+  REMOVED = 5;
+  PENDING_REVIEW = 6;
+  REJECTED = 7;
+}
+
+
+enum CreativeType {
+  CREATIVE_TYPE_UNSPECIFIED = 0;
+  IMAGE = 1;
+  VIDEO = 2;
+  TEXT = 3;
+  CAROUSEL = 4;
+  HTML5 = 5;
+}
+
+enum AudienceType {
+  AUDIENCE_TYPE_UNSPECIFIED = 0;
+  CUSTOM_AUDIENCE = 1;
+  LOOKALIKE_AUDIENCE = 2;
+  INTEREST_BASED = 3;
+  DEMOGRAPHIC_BASED = 4;
+}
+
+enum AudienceSyncStatus {
+  AUDIENCE_SYNC_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  IN_PROGRESS = 2;
+  COMPLETED = 3;
+  FAILED = 4;
+  NEEDS_ATTENTION = 5;
+}
+
+enum FeedFormat {
+  FEED_FORMAT_UNSPECIFIED = 0;
+  CSV = 1;
+  XML = 2;
+  TSV = 3;
+  JSON = 4; // For some networks
+}
+
+enum FeedSubmissionStatus {
+  FEED_SUBMISSION_STATUS_UNSPECIFIED = 0;
+  SUBMITTED = 1;
+  PROCESSING = 2;
+  SUCCESS = 3;
+  FAILED_VALIDATION = 4;
+  FAILED_PROCESSING = 5;
+  PARTIAL_SUCCESS = 6;
+}
+
+enum ValidationSeverity {
+  VALIDATION_SEVERITY_UNSPECIFIED = 0;
+  ERROR = 1;   // Blocks submission
+  WARNING = 2; // May cause issues, informational
+  INFO = 3;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  SUCCESS = 1;
+  FAILURE = 2;
+  PARTIAL_SUCCESS = 3;
+}
+
+enum Granularity {
+  GRANULARITY_UNSPECIFIED = 0;
+  DAILY = 1;
+  HOURLY = 2;
+  TOTAL = 3; // Overall summary
+}
+
+message ErrorDetail {
+  int32 code = 1;         // Internal error code or ad network error code
+  string message = 2;     // Human-readable error message
+  string details = 3;     // Additional details or stack trace (for internal logging)
+  string ad_network_error_code = 4; // Specific error code from the ad network if available
+}
+
+message PagingInfo {
+  int32 page_size = 1;
+  string next_page_token = 2;
+}
+```

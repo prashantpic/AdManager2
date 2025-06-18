@@ -1,0 +1,135 @@
+erDiagram
+    Merchant {
+        UUID id PK
+    }
+    Campaign {
+        UUID id PK
+        UUID merchantId FK
+        VARCHAR name
+        DECIMAL budget
+        DATETIME startDate
+        DATETIME endDate
+        ENUM status
+    }
+    AdNetwork {
+        UUID id PK
+        VARCHAR name UK
+        VARCHAR apiEndpoint
+    }
+    CampaignAdNetwork {
+        UUID campaignId PK, FK
+        UUID adNetworkId PK, FK
+        ENUM status
+    }
+    AdSet {
+        UUID id PK
+        UUID campaignId FK
+        UUID adNetworkId FK
+        VARCHAR name
+        ENUM budgetType
+        DECIMAL budgetAmount
+    }
+    AdCreative {
+        UUID id PK
+        UUID adNetworkId FK
+        UUID merchantId FK
+        ENUM type
+        VARCHAR contentUrl
+        ENUM validationStatus
+    }
+    Ad {
+        UUID id PK
+        UUID adSetId FK
+        UUID adCreativeId FK
+        UUID promotionId FK
+        VARCHAR destinationUrl
+        ENUM status
+    }
+    Promotion {
+        UUID id PK
+        UUID merchantId FK
+        VARCHAR name
+        ENUM type
+        DATETIME startDate
+        DATETIME endDate
+    }
+    DiscountCode {
+        UUID id PK
+        UUID promotionId FK
+        UUID merchantId FK
+        VARCHAR code UK
+        ENUM discountType
+        DECIMAL discountValue
+    }
+    ABTest {
+        UUID id PK
+        UUID campaignId FK
+        UUID merchantId FK
+        VARCHAR name
+        ENUM testType
+        DATETIME startDate
+        DATETIME endDate
+    }
+    Audience {
+        UUID id PK
+        UUID merchantId FK
+        VARCHAR name
+        ENUM type
+    }
+    ProductCatalog {
+        UUID id PK
+        UUID merchantId FK
+        VARCHAR name
+        ENUM status
+    }
+    Product {
+        UUID id PK
+        UUID productCatalogId FK
+        UUID merchantId FK
+        UUID coreProductId
+        VARCHAR adTitle
+    }
+    LandingPage {
+        UUID id PK
+        UUID campaignId FK
+        UUID merchantId FK
+        VARCHAR title
+        VARCHAR urlSlug UK
+    }
+    DailyCampaignPerformanceSummary {
+        DATE date PK
+        UUID campaignId PK, FK
+        UUID adNetworkId PK, FK
+        UUID merchantId PK, FK
+        BIGINT totalImpressions
+        DECIMAL totalSpend
+    }
+
+    Merchant ||--|{ Campaign : manages
+    Merchant ||--|{ AdCreative : owns
+    Merchant ||--|{ Promotion : offers
+    Merchant ||--|{ Audience : defines
+    Merchant ||--|{ ProductCatalog : manages
+    Merchant ||--|{ LandingPage : owns
+    Merchant ||--|{ DailyCampaignPerformanceSummary : summarizes_for
+
+    Campaign ||--|{ CampaignAdNetwork : uses
+    AdNetwork ||--|{ CampaignAdNetwork : used_by
+
+    Campaign ||--|{ AdSet : contains
+    AdNetwork ||--|{ AdSet : scoped_to
+
+    AdSet ||--|{ Ad : includes
+    AdCreative ||--|{ Ad : uses
+
+    Promotion }|--o{ Ad : associated_with
+    Promotion ||--|{ DiscountCode : provides
+
+    Campaign ||--|{ ABTest : tests
+
+    LandingPage }o--|| Campaign : optional_link
+
+    ProductCatalog ||--|{ Product : contains
+
+    Campaign ||--|{ DailyCampaignPerformanceSummary : summarized_in
+    AdNetwork ||--|{ DailyCampaignPerformanceSummary : summarized_in

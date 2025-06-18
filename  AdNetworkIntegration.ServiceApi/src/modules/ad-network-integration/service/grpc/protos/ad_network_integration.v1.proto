@@ -1,0 +1,332 @@
+```protobuf
+syntax = "proto3";
+
+package AdManager.AdNetworkIntegration.Service.V1;
+
+import "common.v1.proto"; // Import common types
+
+option csharp_namespace = "AdManager.AdNetworkIntegration.Service.V1.Grpc";
+
+// Main service for ad network integration
+service AdNetworkIntegration {
+  // Campaign Management
+  rpc CreateCampaign (CreateCampaignRequest) returns (CreateCampaignResponse);
+  rpc UpdateCampaign (UpdateCampaignRequest) returns (UpdateCampaignResponse); 
+  rpc GetCampaign (GetCampaignRequest) returns (CampaignDetailsResponse); 
+  rpc UpdateAdSet (UpdateAdSetRequest) returns (UpdateAdSetResponse);
+  rpc GetAdSet (GetAdSetRequest) returns (AdSetDetailsResponse); 
+
+  // Creative Management
+  rpc UploadCreative (UploadCreativeRequest) returns (UploadCreativeResponse);
+  rpc GetCreative (GetCreativeRequest) returns (CreativeDetailsResponse); 
+
+  // Performance Metrics
+  rpc GetPerformanceMetrics (GetPerformanceMetricsRequest) returns (GetPerformanceMetricsResponse);
+
+  // Audience Synchronization
+  rpc SyncAudience (SyncAudienceRequest) returns (SyncAudienceResponse);
+  rpc GetAudienceSyncStatus (GetAudienceSyncStatusRequest) returns (AudienceSyncStatusResponse); 
+
+  // Product Feed Submission
+  rpc SubmitProductFeed (SubmitProductFeedRequest) returns (SubmitProductFeedResponse);
+  rpc GetProductFeedStatus (GetProductFeedStatusRequest) returns (ProductFeedStatusResponse); 
+
+  // Validation
+  rpc ValidateCampaignData (ValidateCampaignDataRequest) returns (ValidateCampaignDataResponse);
+  rpc ValidateCreativeData (ValidateCreativeDataRequest) returns (ValidateCreativeDataResponse); 
+  rpc ValidateFeedData (ValidateFeedDataRequest) returns (ValidateFeedDataResponse); 
+}
+
+// --- Message Definitions ---
+
+// Common Structures
+message Campaign {
+  string id = 1;
+  string name = 2;
+  AdManager.Common.V1.CampaignStatus status = 3;
+  double budget = 4;
+  string start_date = 5; // ISO 8601 format
+  string end_date = 6;   // ISO 8601 format
+  AdManager.Common.V1.AdNetworkType ad_network = 7;
+  string merchant_id = 8;
+  // Add other common campaign fields as needed
+}
+
+message AdSet {
+  string id = 1;
+  string campaign_id = 2;
+  string name = 3;
+  AdManager.Common.V1.AdSetStatus status = 4; 
+  double budget = 5;
+  // Add other common ad set fields
+}
+
+message Creative {
+  string id = 1;
+  string name = 2;
+  AdManager.Common.V1.CreativeType type = 3;
+  string asset_url = 4; // URL to the creative asset
+  map<string, string> metadata = 5; // e.g., headline, body text
+  AdManager.Common.V1.AdNetworkType ad_network = 6;
+  string merchant_id = 7;
+}
+
+message PerformanceMetrics {
+  string campaign_id = 1;
+  string ad_set_id = 2;
+  string ad_id = 3;
+  int64 impressions = 4;
+  int64 clicks = 5;
+  int64 conversions = 6;
+  double spend = 7;
+  double roas = 8;
+  double cpa = 9;
+  // Add other relevant metrics
+}
+
+message Audience {
+  string id = 1;
+  string name = 2;
+  AdManager.Common.V1.AudienceType type = 3;
+  string description = 4;
+  int64 size = 5;
+  AdManager.Common.V1.AdNetworkType ad_network = 6;
+  string merchant_id = 7;
+  // PII data for custom audiences will not be passed directly.
+  // Instead, an identifier to a pre-synced or to-be-synced audience list might be used.
+  // Or, the service might receive instructions to build an audience from platform data.
+}
+
+message ProductFeed {
+  string id = 1;
+  string name = 2;
+  string feed_url = 3; // URL if hosted, or content if submitted directly
+  bytes feed_content = 4; // For direct submission
+  AdManager.Common.V1.FeedFormat format = 5; 
+  AdManager.Common.V1.AdNetworkType ad_network = 6;
+  string merchant_id = 7;
+}
+
+message ValidationResultItem {
+  string field_path = 1;
+  string message = 2;
+  AdManager.Common.V1.ValidationSeverity severity = 3;
+}
+
+// CreateCampaign
+message CreateCampaignRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  string name = 3;
+  double budget = 4;
+  string start_date = 5;
+  string end_date = 6;
+  AdManager.Common.V1.CampaignStatus initial_status = 7;
+  // ... other campaign parameters
+}
+message CreateCampaignResponse {
+  string campaign_id = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// UpdateCampaign 
+message UpdateCampaignRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string campaign_id = 2;
+  string merchant_id = 3;
+  optional string name = 4;
+  optional double budget = 5;
+  optional string start_date = 6;
+  optional string end_date = 7;
+  optional AdManager.Common.V1.CampaignStatus campaign_status = 8;
+}
+message UpdateCampaignResponse {
+  string campaign_id = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// GetCampaign 
+message GetCampaignRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string campaign_id = 2;
+  string merchant_id = 3;
+}
+message CampaignDetailsResponse {
+  Campaign campaign = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+
+// UpdateAdSet
+message UpdateAdSetRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string ad_set_id = 2;
+  string merchant_id = 3;
+  // ... ad set parameters to update
+  optional string name = 4;
+  optional double budget = 5;
+  optional AdManager.Common.V1.AdSetStatus ad_set_status = 6;
+}
+message UpdateAdSetResponse {
+  string ad_set_id = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// GetAdSet 
+message GetAdSetRequest {
+    AdManager.Common.V1.AdNetworkType ad_network = 1;
+    string ad_set_id = 2;
+    string merchant_id = 3;
+}
+message AdSetDetailsResponse {
+    AdSet ad_set = 1;
+    AdManager.Common.V1.Status status = 2;
+    AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+
+// UploadCreative
+message UploadCreativeRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  string name = 3;
+  AdManager.Common.V1.CreativeType type = 4;
+  string asset_url = 5; // if pre-uploaded
+  bytes asset_content = 6; // if submitting raw bytes
+  string file_name = 7; // if submitting raw bytes
+  map<string, string> metadata = 8;
+}
+message UploadCreativeResponse {
+  string creative_id = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// GetCreative 
+message GetCreativeRequest {
+    AdManager.Common.V1.AdNetworkType ad_network = 1;
+    string creative_id = 2;
+    string merchant_id = 3;
+}
+message CreativeDetailsResponse {
+    Creative creative = 1;
+    AdManager.Common.V1.Status status = 2;
+    AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// GetPerformanceMetrics
+message GetPerformanceMetricsRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  repeated string campaign_ids = 3;
+  repeated string ad_set_ids = 4;
+  repeated string ad_ids = 5;
+  string start_date = 6;
+  string end_date = 7;
+  AdManager.Common.V1.Granularity granularity = 8; 
+}
+message GetPerformanceMetricsResponse {
+  repeated PerformanceMetrics metrics = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// SyncAudience
+message SyncAudienceRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  string audience_id_platform = 3; 
+  string name = 4;
+  AdManager.Common.V1.AudienceType type = 5;
+  string description = 6;
+  repeated string user_segment_ids = 7;
+}
+message SyncAudienceResponse {
+  string audience_id_network = 1; 
+  AdManager.Common.V1.AudienceSyncStatus sync_status = 2;
+  AdManager.Common.V1.Status status = 3;
+  AdManager.Common.V1.ErrorDetail error = 4;
+}
+
+// GetAudienceSyncStatus 
+message GetAudienceSyncStatusRequest {
+    AdManager.Common.V1.AdNetworkType ad_network = 1;
+    string audience_id_network = 2; 
+    string merchant_id = 3;
+}
+message AudienceSyncStatusResponse {
+    Audience audience_details = 1; 
+    AdManager.Common.V1.AudienceSyncStatus sync_status = 2;
+    AdManager.Common.V1.Status status = 3;
+    AdManager.Common.V1.ErrorDetail error = 4;
+}
+
+// SubmitProductFeed
+message SubmitProductFeedRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  string catalog_id_platform = 3; 
+  string feed_url = 4; 
+  bytes feed_content = 5; 
+  AdManager.Common.V1.FeedFormat feed_format = 6;
+}
+message SubmitProductFeedResponse {
+  string feed_id_network = 1; 
+  AdManager.Common.V1.FeedSubmissionStatus submission_status = 2;
+  AdManager.Common.V1.Status status = 3;
+  AdManager.Common.V1.ErrorDetail error = 4;
+}
+
+// GetProductFeedStatus 
+message GetProductFeedStatusRequest {
+    AdManager.Common.V1.AdNetworkType ad_network = 1;
+    string feed_id_network = 2; 
+    string merchant_id = 3;
+}
+message ProductFeedStatusResponse {
+    ProductFeed feed_details = 1;
+    AdManager.Common.V1.FeedSubmissionStatus submission_status = 2;
+    AdManager.Common.V1.Status status = 3;
+    AdManager.Common.V1.ErrorDetail error = 4;
+}
+
+// ValidateCampaignData
+message ValidateCampaignDataRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  Campaign campaign_data = 3; 
+}
+message ValidateCampaignDataResponse {
+  repeated ValidationResultItem results = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// ValidateCreativeData 
+message ValidateCreativeDataRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  Creative creative_data = 3;
+}
+message ValidateCreativeDataResponse {
+  repeated ValidationResultItem results = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+
+// ValidateFeedData 
+message ValidateFeedDataRequest {
+  AdManager.Common.V1.AdNetworkType ad_network = 1;
+  string merchant_id = 2;
+  ProductFeed feed_data = 3; 
+}
+message ValidateFeedDataResponse {
+  repeated ValidationResultItem results = 1;
+  AdManager.Common.V1.Status status = 2;
+  AdManager.Common.V1.ErrorDetail error = 3;
+}
+```

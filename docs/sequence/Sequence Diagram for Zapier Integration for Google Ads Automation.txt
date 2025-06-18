@@ -1,0 +1,65 @@
+sequenceDiagram
+    actor "Merchant" as Merchant
+    participant "Zapier Platform" as ExternalZapierGoogleAdsIntegration
+    participant "ThirdPartyConnectivityService" as thirdpartyconnectivityservice014
+    participant "Ad Manager Internal Event Source" as AdManagerInternalEventSource
+    participant "Google Ads API" as ExternalAdNetworkGoogleAdsAPI
+
+    Merchant-ExternalZapierGoogleAdsIntegration: 1. Configures Zap in Zapier UI
+    activate ExternalZapierGoogleAdsIntegration
+    note right of Merchant: Merchant sets up a trigger (e.g., 'New Record in Ad Manager App') and an action (e.g., 'Add User to Google Ads Audience').
+
+    ExternalZapierGoogleAdsIntegration-thirdpartyconnectivityservice014: 1.1.1. [During Zap Setup if Webhook Trigger] Test/Register Webhook Subscription for Event
+    activate thirdpartyconnectivityservice014
+    note right of thirdpartyconnectivityservice014: Zapier App for Ad Manager might use webhooks for real-time triggers or polling via an API exposed by ThirdPartyConnectivityService.
+    thirdpartyconnectivityservice014--ExternalZapierGoogleAdsIntegration: 1.1.2. Webhook Subscription ACK/URL Confirmed
+    deactivate thirdpartyconnectivityservice014
+
+    ExternalZapierGoogleAdsIntegration-ExternalAdNetworkGoogleAdsAPI: 1.1.3. [During Zap Setup] Authenticate & Test Google Ads Connection
+    activate ExternalAdNetworkGoogleAdsAPI
+    ExternalAdNetworkGoogleAdsAPI--ExternalZapierGoogleAdsIntegration: 1.1.4. Google Ads Connection Verified
+    deactivate ExternalAdNetworkGoogleAdsAPI
+
+    ExternalZapierGoogleAdsIntegration--Merchant: 1.1. Zap Configuration UI Presented
+
+    Merchant-ExternalZapierGoogleAdsIntegration: 1.2. Saves and Enables Zap
+    ExternalZapierGoogleAdsIntegration--Merchant: 1.3. Zap Saved and Active
+    deactivate ExternalZapierGoogleAdsIntegration
+
+    AdManagerInternalEventSource-thirdpartyconnectivityservice014: 2. Relevant Event Occurs (e.g., New Lead for Audience Segment)
+    activate thirdpartyconnectivityservice014
+    note right of AdManagerInternalEventSource: An internal Ad Manager service detects an event matching a Zapier trigger criteria.
+
+    thirdpartyconnectivityservice014-ExternalZapierGoogleAdsIntegration: 3. Send Webhook Notification (payload: event_data)
+    activate ExternalZapierGoogleAdsIntegration
+    note right of thirdpartyconnectivityservice014: This step occurs if Ad Manager's Zapier App uses webhooks. If polling, Zapier would initiate step 3 by calling an API on ThirdPartyConnectivityService.
+    ExternalZapierGoogleAdsIntegration--thirdpartyconnectivityservice014: 3.1. Webhook Received (HTTP 200 OK)
+    deactivate thirdpartyconnectivityservice014
+
+    loop 4. Zap Triggered: Execute Zap Logic (Filter, Format, Map Data)
+        note over ExternalZapierGoogleAdsIntegration: Zapier's internal engine processes the incoming data according to the Zap's configuration. This includes data transformation and mapping for the Google Ads action.
+        ExternalZapierGoogleAdsIntegration-ExternalZapierGoogleAdsIntegration: Internal Data Processing
+    end
+
+    ExternalZapierGoogleAdsIntegration-ExternalAdNetworkGoogleAdsAPI: 5. API Call: Perform Action (e.g., Add User to Audience, Update Campaign)
+    activate ExternalAdNetworkGoogleAdsAPI
+    note right of ExternalZapierGoogleAdsIntegration: Zapier handles authentication with Google Ads API. Retries for transient errors are managed by Zapier.
+    ExternalAdNetworkGoogleAdsAPI--ExternalZapierGoogleAdsIntegration: 5.1. Google Ads API Response (Success/Failure)
+    deactivate ExternalAdNetworkGoogleAdsAPI
+
+    ExternalZapierGoogleAdsIntegration-ExternalZapierGoogleAdsIntegration: 6. Log Zap Run History & Status
+
+    opt IF Ad Manager is an Action Step
+        ExternalZapierGoogleAdsIntegration-thirdpartyconnectivityservice014: 7. API Call to Ad Manager (e.g., Update Lead Status)
+        activate thirdpartyconnectivityservice014
+        note right of ExternalZapierGoogleAdsIntegration: This occurs if the Zap is configured to send data back to Ad Manager, making Ad Manager an 'action' in the Zap.
+        thirdpartyconnectivityservice014--ExternalZapierGoogleAdsIntegration: 7.1. Ad Manager API Response (ACK)
+        deactivate thirdpartyconnectivityservice014
+    end
+
+    deactivate ExternalZapierGoogleAdsIntegration
+
+    note over Merchant, ExternalAdNetworkGoogleAdsAPI: Data Mapping & Protocol Transformation: Handled by the Zapier platform based on merchant's Zap configuration. Ad Manager provides data via webhook/API; Zapier consumes it, maps it, and calls Google Ads API in its required format.
+    note over Merchant, ExternalAdNetworkGoogleAdsAPI: Synchronization: This flow shows Zapier-driven actions. Ad Manager's AdNetworkIntegrationService may perform separate, periodic background syncs with Google Ads to ensure overall data consistency, independently of this Zapier flow.
+    note over Merchant, ExternalAdNetworkGoogleAdsAPI: Retry Policies & Circuit Breakers: Zapier has built-in retry mechanisms for its steps, including calls to Google Ads API. If ThirdPartyConnectivityService calls Zapier webhooks, it should implement its own retries for transient failures.
+    note over Merchant, ExternalAdNetworkGoogleAdsAPI: Idempotency: Webhook endpoints on Zapier and API endpoints on ThirdPartyConnectivityService (if called by Zapier) should ideally be idempotent. Google Ads API operations called by Zapier should also consider idempotency.

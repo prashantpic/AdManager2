@@ -1,0 +1,49 @@
+version: 0.2
+env:
+  variables:
+    SONAR_SCANNER_VERSION: "5.0.1.3006" # Example, use latest appropriate version from SonarSource
+    # SONAR_HOST_URL, SONAR_PROJECT_KEY, SONAR_ORGANIZATION will be passed as CodeBuild project environment variables
+    # SONAR_LOGIN (the token) will be passed via secrets-manager
+  secrets-manager:
+    SONAR_TOKEN: "<SONARQUBE_TOKEN_SECRET_ARN_PLACEHOLDER>:sonarToken" # Replace <SONARQUBE_TOKEN_SECRET_ARN_PLACEHOLDER> with actual ARN
+                                                                  # and 'sonarToken' with the JSON key in the secret
+phases:
+  install:
+    runtime-versions:
+      java: corretto17 # SonarScanner requires Java
+      nodejs: 20 # If your project build steps are also run here, or for other tools
+    commands:
+      - echo "Downloading SonarScanner CLI..."
+      - apt-get update && apt-get install -y unzip # Ensure unzip is available
+      - curl --create-dirs -sSLo sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip"
+      - unzip -o sonar-scanner.zip -d /opt/
+      - export PATH=$PATH:/opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin
+      - sonar-scanner -v
+  build:
+    commands:
+      - echo "Running SonarQube scan..."
+      # SONAR_PROJECT_KEY, SONAR_ORGANIZATION (if SonarCloud), SONAR_HOST_URL are expected to be set as environment variables in CodeBuild
+      # SONAR_TOKEN is injected from Secrets Manager
+      # Common parameters:
+      # -Dsonar.sources=. (analyze all files in the current directory)
+      # -Dsonar.exclusions=**/*spec.ts,**/__tests__/** (example exclusions)
+      # -Dsonar.coverage.exclusions=...
+      # -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info (example for JS/TS code coverage)
+      # -Dsonar.qualitygate.wait=true (optional, makes the scanner wait for Quality Gate result - might increase build time)
+      - sonar-scanner \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+          -Dsonar.organization=${SONAR_ORGANIZATION:-} \
+          -Dsonar.sources=. \
+          -Dsonar.scm.provider=git \
+          -Dsonar.verbose=true
+          # Add other SonarQube parameters as needed (e.g., exclusions, coverage reports path)
+          # Example for coverage: -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+  # post_build: # Optional: Add post_build to check quality gate if SonarQube API allows easy check
+    # commands:
+    #   - echo "Checking SonarQube Quality Gate status..."
+    #   # This usually requires custom scripting and jq to parse API response.
+    #   # The `sonar.qualitygate.wait=true` parameter in the scan is often simpler if direct feedback is needed.
+# No artifacts produced by this stage usually, results are on SonarQube server.
+# If reports are needed as artifacts, configure SonarScanner to output them and add to artifact section.

@@ -1,0 +1,148 @@
+openapi: 3.1.0
+info:
+  title: Ad Manager Third-Party Application API
+  version: v1
+  description: API for authorized third-party applications to integrate with the Ad Manager platform.
+  contact:
+    name: Ad Manager Developer Relations
+    email: dev-relations@admanager.example.com
+
+servers:
+  - url: https://{stage}.api.admanager.example.com/external/v1
+    variables:
+      stage:
+        default: dev
+        description: The deployment stage (e.g., dev, prod).
+  - url: http://localhost:3000/external/v1 # For local development if proxied
+    description: Local development server
+
+tags:
+  - name: Data Points
+    description: Endpoints for third-party applications to submit or retrieve specific data points.
+  - name: Scoped Campaign Access
+    description: Limited access to campaign data based on granted OAuth scopes.
+
+paths:
+  /data-points:
+    post:
+      tags:
+        - Data Points
+      summary: Submit a data point
+      description: Allows an authorized third-party application to submit a specific data point related to a merchant.
+      operationId: submitDataPoint
+      parameters:
+        - $ref: './shared-components.yaml#/components/parameters/CorrelationIdHeader'
+      requestBody:
+        description: Data point to be submitted.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThirdPartyDataPointInput'
+      security:
+        # This API might use a different JWT (e.g., issued for the app via OAuth client credentials)
+        # or require specific scopes within the standard JWT.
+        - JWTBearerAuth: [] # Potentially with specific scopes like 'data:write'
+        # - OAuth2ClientCredentials: ['data:write'] # Alternative or additional
+      responses:
+        '202':
+          description: Data point accepted for processing.
+        '400':
+          $ref: './shared-components.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: './shared-components.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: './shared-components.yaml#/components/responses/ForbiddenError'
+        '500':
+          $ref: './shared-components.yaml#/components/responses/InternalServerError'
+
+  /campaigns: # Example of scoped access
+    get:
+      tags:
+        - Scoped Campaign Access
+      summary: List accessible campaigns
+      description: Retrieves a list of campaigns accessible to the third-party application based on its granted permissions.
+      operationId: listAccessibleCampaigns
+      parameters:
+        - name: merchantId # May be required if app acts on behalf of multiple merchants
+          in: query
+          required: true # Or false if implicit
+          schema:
+            type: string
+            format: uuid
+        - $ref: './shared-components.yaml#/components/parameters/CorrelationIdHeader'
+      security:
+        - JWTBearerAuth: [] # Scopes like 'campaigns:read'
+        # - OAuth2AuthorizationCode: ['campaigns:read']
+      responses:
+        '200':
+          description: A list of accessible campaigns.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './shared-components.yaml#/components/schemas/Campaign' # Or a limited view
+        '401':
+          $ref: './shared-components.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: './shared-components.yaml#/components/responses/ForbiddenError'
+        '500':
+          $ref: './shared-components.yaml#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    ThirdPartyDataPointInput:
+      type: object
+      properties:
+        merchantId:
+          type: string
+          format: uuid
+          description: The ID of the merchant this data point relates to.
+        dataType:
+          type: string
+          description: Type identifier for the data point.
+        payload:
+          type: object
+          additionalProperties: true
+          description: The actual data payload.
+      required:
+        - merchantId
+        - dataType
+        - payload
+
+    ErrorResponse:
+      $ref: './shared-components.yaml#/components/schemas/ErrorResponse'
+    Campaign: # This might be a more restricted view of the Campaign schema for 3rd parties
+      $ref: './shared-components.yaml#/components/schemas/Campaign'
+
+
+  securitySchemes:
+    JWTBearerAuth: # Re-using for simplicity, but could be a distinct scheme for apps
+      $ref: './shared-components.yaml#/components/securitySchemes/JWTBearerAuth'
+
+    # Example: OAuth 2.0 Client Credentials flow for app-to-app communication
+    OAuth2ClientCredentials:
+      type: oauth2
+      description: OAuth 2.0 Client Credentials Grant for server-to-server app authentication.
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.admanager.example.com/oauth/token
+          scopes:
+            'data:write': Allows submitting data points.
+            'data:read': Allows reading specific data.
+            'campaigns:read': Allows reading campaign information.
+            'campaigns:manage': Allows managing campaigns.
+
+    # Example: OAuth 2.0 Authorization Code flow for apps acting on behalf of users
+    OAuth2AuthorizationCode:
+      type: oauth2
+      description: OAuth 2.0 Authorization Code Grant for apps acting on behalf of a user.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.admanager.example.com/oauth/authorize
+          tokenUrl: https://auth.admanager.example.com/oauth/token
+          scopes:
+            'profile': Access user profile.
+            'campaigns:read': Read access to user's campaigns.
+            'campaigns:manage': Manage user's campaigns.

@@ -1,0 +1,30 @@
+{
+  "name": "admanager-performance-tests",
+  "version": "1.0.0",
+  "description": "Performance test scripts for Ad Manager platform using k6.",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test:create_campaign_load": "k6 run --env K6_ENV=${K6_ENV:-dev} --env K6_USER_1=${K6_USER_1} --env K6_PASSWORD_1=${K6_PASSWORD_1} scenarios/campaign_management/create_campaign_load.js",
+    "test:list_campaigns_stress": "k6 run --env K6_ENV=${K6_ENV:-dev} --env K6_USER_1=${K6_USER_1} --env K6_PASSWORD_1=${K6_PASSWORD_1} scenarios/campaign_management/list_campaigns_stress.js",
+    "test:product_catalog_scalability": "k6 run --env K6_ENV=${K6_ENV:-dev} --env K6_USER_1=${K6_USER_1} --env K6_PASSWORD_1=${K6_PASSWORD_1} scenarios/product_catalog/list_large_catalog_scalability.js",
+    "test:impression_load": "k6 run --env K6_ENV=${K6_ENV:-dev} --env IMPRESSION_API_KEY=${IMPRESSION_API_KEY} scenarios/analytics_ingestion/simulate_impression_load.js",
+    "test:critical_apis_load": "k6 run --env K6_ENV=${K6_ENV:-dev} --env K6_USER_1=${K6_USER_1} --env K6_PASSWORD_1=${K6_PASSWORD_1} scenarios/general_platform/critical_api_endpoints_load.js",
+    "test:soak": "k6 run --env K6_ENV=${K6_ENV:-dev} --env K6_USER_1=${K6_USER_1} --env K6_PASSWORD_1=${K6_PASSWORD_1} scenarios/general_platform/platform_soak_test.js",
+    "test:landing_page_responsiveness": "k6 run --env K6_ENV=${K6_ENV:-dev} --env LANDING_PAGE_BASE_URL=${LANDING_PAGE_BASE_URL} scenarios/landing_pages/landing_page_responsiveness.js"
+  },
+  "keywords": [
+    "k6",
+    "performance-testing",
+    "admanager"
+  ],
+  "author": "AdManager Performance Team",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^2.0.0",
+    "@types/k6": "^0.49.0",
+    "papaparse": "^5.3.0"
+  }
+}

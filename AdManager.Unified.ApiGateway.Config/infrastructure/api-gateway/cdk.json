@@ -1,0 +1,53 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/api-gateway.ts",
+  "watch": {
+    "include": [
+      "**"
+    ],
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "**/*.js",
+      "tsconfig.json",
+      "package*.json",
+      "yarn.lock",
+      "node_modules",
+      "cdk.out",
+      "dist",
+      "test"
+    ]
+  },
+  "context": {
+    "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
+    "@aws-cdk/core:stackRelativeExports": "true",
+    "@aws-cdk/aws-rds:lowercaseDbIdentifier": true,
+    "@aws-cdk/aws-lambda:recognizeVersionProps": true,
+    "@aws-cdk/aws-cloudfront:defaultSecurityPolicyTLSv1.2_2021": true,
+    "dev:customDomainName": "dev.api.admanager.example.com",
+    "dev:certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/your-dev-cert-id",
+    "dev:hostedZoneId": "YOUR_DEV_HOSTED_ZONE_ID",
+    "dev:jwksUri": "https://dev-auth.example.com/.well-known/jwks.json",
+    "dev:jwtIssuer": "https://dev-auth.example.com/",
+    "dev:jwtAudience": "your-dev-api-audience,another-dev-audience",
+    "dev:campaignServiceEndpoint": "https://dev.campaign-service.example.com",
+    "dev:productCatalogServiceEndpoint": "https://dev.product-catalog-service.example.com",
+    "dev:analyticsServiceEndpoint": "https://dev.analytics-service.example.com",
+    "dev:adminServiceEndpoint": "https://dev.admin-service.example.com",
+    "dev:affiliateServiceEndpoint": "https://dev.affiliate-service.example.com",
+    "dev:thirdPartyAppServiceEndpoint": "https://dev.third-party-app-service.example.com",
+
+    "prod:customDomainName": "api.admanager.example.com",
+    "prod:certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/your-prod-cert-id",
+    "prod:hostedZoneId": "YOUR_PROD_HOSTED_ZONE_ID",
+    "prod:jwksUri": "https://auth.example.com/.well-known/jwks.json",
+    "prod:jwtIssuer": "https://auth.example.com/",
+    "prod:jwtAudience": "your-prod-api-audience",
+    "prod:campaignServiceEndpoint": "https://campaign-service.example.com",
+    "prod:productCatalogServiceEndpoint": "https://product-catalog-service.example.com",
+    "prod:analyticsServiceEndpoint": "https://analytics-service.example.com",
+    "prod:adminServiceEndpoint": "https://admin-service.example.com",
+    "prod:affiliateServiceEndpoint": "https://affiliate-service.example.com",
+    "prod:thirdPartyAppServiceEndpoint": "https://third-party-app-service.example.com"
+  }
+}

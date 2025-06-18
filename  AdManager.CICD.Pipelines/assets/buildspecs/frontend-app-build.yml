@@ -1,0 +1,36 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo Installing dependencies...
+      - npm ci # Or yarn install
+  pre_build:
+    commands:
+      - echo Running linters...
+      - npm run lint # Or yarn lint
+  build:
+    commands:
+      - echo Running tests...
+      - npm run test # Ensure this script generates reports if used by 'reports' section
+      - echo Building application...
+      - npm run build # Or next build, etc.
+  post_build:
+    commands:
+      - echo Frontend build completed. Artifacts are typically in 'build', 'dist', or '.next' directory.
+      # No specific packaging needed here if the entire build output directory is the artifact.
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: 'build' # Or 'dist', or '.next' for Next.js, or other output directory specified by the frontend framework
+  discard-paths: no
+  # name: FrontendBuildOutputArtifact # Optional
+
+reports:
+  TestReportGroupFrontend: # This name should match a cdk.aws_codebuild.ReportGroup resource name or ARN
+    files:
+      - 'junit.xml' # Path to JUnit XML report
+    file-format: 'JUNITXML'
+    base-directory: 'test-results' # Directory where test reports are generated

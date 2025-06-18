@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package admanager.coreplatformintegration.service.v1;
+
+message EmptyRequest {}
+
+message ApiStatusResponse {
+  string status = 1; // e.g., "OPERATIONAL", "DEGRADED", "DOWN"
+  optional string message = 2;
+  string checked_api = 3; // Identifier for the API that was checked
+}

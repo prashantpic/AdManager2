@@ -1,0 +1,55 @@
+# Global values applicable to all services deployed in the Development environment
+
+global:
+  environmentType: "development"
+  domainName: "dev.admanager.local" # Example development domain suffix
+  clusterIssuerName: "letsencrypt-staging" # For cert-manager, use staging issuer in dev
+  imagePullPolicy: "Always" # Default pull policy for dev; ensures latest images are used
+
+  # Default resource requests/limits for the development environment, if not overridden per-service
+  # These are minimal to conserve resources in dev.
+  defaultResources:
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+
+  # Common annotations to apply to all pods in development
+  # podAnnotations:
+  #   environment: "development"
+  #   cost-center: "engineering-dev"
+
+  # Common labels for all resources in development
+  # commonLabels:
+  #   env: "dev"
+
+  # Configuration for common services, e.g., logging or monitoring agents, if different in dev
+  # fluentBit:
+  #   config:
+  #     logLevel: "debug"
+
+  # Istio configuration (global toggle, can be overridden per service)
+  # istio:
+  #   enabled: false # May disable Istio globally in dev for simplicity or resource constraints
+
+  # External DNS configuration (if used)
+  # externalDns:
+  #   domainFilters:
+  #     - dev.admanager.local
+
+# You can add other global settings here that are common across your microservices in development.
+# For example, default configurations for tracing, common message queue endpoints for dev, etc.
+
+# Example: Default settings for a shared Redis cache in dev
+# redis:
+#   url: "redis://redis-dev.internal:6379/0"
+#   useTLS: false
+
+# Example: Default settings for a shared database (less common to put credentials here, use secrets)
+# database:
+#   type: "postgresql"
+#   host: "db-dev.internal"
+#   port: 5432
+#   defaultUser: "dev_user" # Secret for password would still be managed separately

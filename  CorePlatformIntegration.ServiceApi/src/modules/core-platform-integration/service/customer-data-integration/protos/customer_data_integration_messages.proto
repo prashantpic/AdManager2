@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package admanager.coreplatformintegration.service.v1;
+
+import "google/protobuf/struct.proto";
+
+message CustomerEligibilityRequest {
+  string customer_id = 1;
+  string promotion_id = 2;
+  google.protobuf.Struct eligibility_criteria = 3;
+}
+
+message CustomerEligibilityResponse {
+  string customer_id = 1;
+  string promotion_id = 2;
+  bool is_eligible = 3;
+}

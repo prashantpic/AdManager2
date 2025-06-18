@@ -1,0 +1,87 @@
+sequenceDiagram
+    actor "AWS RDS Control Plane" as AmazonRDSService
+    participant "AdManager DB (RDS PostgreSQL)" as admanagerpostgresqldb022
+    participant "AWS S3 (Backup Storage)" as AmazonS3
+    participant "Platform Admin Service" as platformadministrationservice010
+
+    note over AmazonRDSService,platformadministrationservice010: Part 1: Automated Backup Operations (Managed by AWS RDS as per REQ-POA-007)
+
+    loop Daily Automated Snapshot Process (REQ-POA-007)
+        activate AmazonRDSService
+        AmazonRDSService-admanagerpostgresqldb022: 1.1. initiateAutomatedSnapshot()
+        activate admanagerpostgresqldb022
+        admanagerpostgresqldb022--AmazonRDSService: snapshotProcessAcknowledged()
+        deactivate admanagerpostgresqldb022
+        AmazonRDSService-AmazonS3: 1.2. storeSnapshotData(dbInstanceId, snapshotData)
+        activate AmazonS3
+        AmazonS3--AmazonRDSService: snapshotStoredConfirmation(snapshotId)
+        deactivate AmazonS3
+        deactivate AmazonRDSService
+    end
+
+    loop Continuous Transaction Log Backup Process (REQ-POA-007)
+        activate AmazonRDSService
+        AmazonRDSService-admanagerpostgresqldb022: 2.1. captureAndStreamTransactionLogs()
+        activate admanagerpostgresqldb022
+        note right of admanagerpostgresqldb022: DB instance continuously streams logs to RDS control plane.
+        admanagerpostgresqldb022--AmazonRDSService: transactionLogBatch(logData)
+        deactivate admanagerpostgresqldb022
+        AmazonRDSService-AmazonS3: 2.2. storeTransactionLogs(dbInstanceId, logData)
+        activate AmazonS3
+        AmazonS3--AmazonRDSService: logStorageConfirmation()
+        deactivate AmazonS3
+        deactivate AmazonRDSService
+    end
+
+    loop Periodic Retention Policy Application (REQ-POA-007)
+        activate AmazonRDSService
+        AmazonRDSService-AmazonS3: 3.1. applyBackupRetentionPolicy(policyDetails)
+        activate AmazonS3
+        AmazonS3--AmazonRDSService: retentionPolicyAppliedAck()
+        deactivate AmazonS3
+        deactivate AmazonRDSService
+    end
+
+    note over AmazonRDSService,platformadministrationservice010: Part 2: Point-in-Time Recovery (PITR) Process initiated by Platform Admin
+
+    platformadministrationservice010-AmazonRDSService: 4. requestPointInTimeRecovery(dbInstanceId='ad-manager-postgresql-db-022', recoveryPointTimestamp='YYYY-MM-DDTHH:MM:SSZ')
+    activate platformadministrationservice010
+    activate AmazonRDSService
+    AmazonRDSService--platformadministrationservice010: pitrProcessInitiated(processId)
+    deactivate platformadministrationservice010
+
+    AmazonRDSService-AmazonRDSService: 5. [Internal] Identify relevant snapshot and logs for recoveryPoint
+    AmazonRDSService-AmazonRDSService: 6. [Internal] Provision new RDS instance (e.g., 'recovered-db-instance')
+
+    AmazonRDSService-AmazonS3: 7. retrieveSnapshotData(identifiedSnapshotId)
+    activate AmazonS3
+    AmazonS3--AmazonRDSService: snapshotDataStream()
+    deactivate AmazonS3
+
+    AmazonRDSService-AmazonRDSService: 8. [Internal] Restore snapshotData to 'recovered-db-instance'
+
+    AmazonRDSService-AmazonS3: 9. retrieveTransactionLogs(fromSnapshotTime, toRecoveryPointTimestamp)
+    activate AmazonS3
+    AmazonS3--AmazonRDSService: transactionLogStream()
+    deactivate AmazonS3
+
+    loop Replay Transaction Logs on Recovered Instance
+        note over AmazonRDSService: Condition: Until recoveryPointTimestamp is reached
+        AmazonRDSService-AmazonRDSService: 10.1. [Internal] Apply transaction log segment to 'recovered-db-instance'
+    end
+
+    AmazonRDSService-AmazonRDSService: 11. [Internal] Finalize recovery of 'recovered-db-instance'
+
+    AmazonRDSService-platformadministrationservice010: 12. notifyPitrCompleted(recoveredInstanceId='recovered-db-instance', endpoint='new.db.endpoint', status='Success')
+    note right of platformadministrationservice010: Asynchronous notification upon PITR completion.
+    deactivate AmazonRDSService
+
+    note over AmazonRDSService,platformadministrationservice010: Part 3: Post-Recovery Application Reconfiguration
+
+    platformadministrationservice010-platformadministrationservice010: 13. initiateApplicationReconfiguration(newDbEndpoint='new.db.endpoint')
+    activate platformadministrationservice010
+    note right of platformadministrationservice010: Platform Admin Service coordinates or triggers application config update.
+    platformadministrationservice010--platformadministrationservice010: reconfigurationProcessStatus()
+    deactivate platformadministrationservice010
+
+    note over AmazonRDSService,platformadministrationservice010: RPO/RTO adherence is supported by these backup and recovery mechanisms (REQ-POA-007, 3.2.3).

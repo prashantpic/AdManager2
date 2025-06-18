@@ -1,0 +1,4 @@
+This is a placeholder for the binary image file 'logo.png'.
+Replace this file with the actual PNG image for the Ad Manager Platform logo.
+The image should be placed in the 'static/img/' directory.
+It is referenced in 'docusaurus.config.js' for the navbar and favicon.

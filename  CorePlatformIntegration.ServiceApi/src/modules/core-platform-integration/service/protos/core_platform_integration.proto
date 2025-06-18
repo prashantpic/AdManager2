@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package admanager.coreplatformintegration.service.v1;
+
+import "modules/core-platform-integration/service/product-integration/protos/product_integration_messages.proto";
+import "modules/core-platform-integration/service/auth-integration/protos/auth_integration_messages.proto";
+import "modules/core-platform-integration/service/customer-data-integration/protos/customer_data_integration_messages.proto";
+import "modules/core-platform-integration/service/order-data-integration/protos/order_data_integration_messages.proto";
+import "modules/core-platform-integration/service/direct-order-integration/protos/direct_order_integration_messages.proto";
+import "modules/core-platform-integration/service/common/protos/common_messages.proto";
+
+service CorePlatformIntegration {
+  // Product Integration
+  rpc SynchronizeProduct (ProductSyncRequest) returns (ProductSyncResponse);
+  rpc ResolveProductConflict (ProductConflictResolutionRequest) returns (ProductConflictResolutionResponse);
+
+  // Auth Integration
+  rpc DelegateAuthentication (AuthRequest) returns (AuthResponse);
+
+  // Customer Data Integration
+  rpc GetCustomerEligibility (CustomerEligibilityRequest) returns (CustomerEligibilityResponse);
+
+  // Order Data Integration
+  rpc GetOrderData (OrderDataRequest) returns (OrderDataResponse);
+
+  // Direct Order Integration
+  rpc GenerateDirectOrderLink (DirectOrderLinkRequest) returns (DirectOrderLinkResponse);
+
+  // Common / Health
+  rpc GetCorePlatformApiStatus (EmptyRequest) returns (ApiStatusResponse);
+}
